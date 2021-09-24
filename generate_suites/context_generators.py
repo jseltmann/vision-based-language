@@ -2,7 +2,7 @@ import os
 import random
 import json
 import nltk
-
+import inflect
 
 random.seed(0)
 
@@ -30,7 +30,14 @@ def ade_thereis_generator(data_path, num_examples):
         Path to ADE20k dataset.
     num_examples: int
         Number of examples to generate.
+
+    Return
+    ------
+    pairs : [FoilPair]
+        List of FoilPairs with the foil examples not yet set.
     """
+
+    p = inflect.engine()
 
     environments = os.listdir(data_path)
     env_paths = [os.path.join(data_path, e) for e in environments]
@@ -43,14 +50,23 @@ def ade_thereis_generator(data_path, num_examples):
         img_info_paths += [os.path.join(sep, ip) for ip in os.listdir(sep) if ip.endswith("json")]
     #TODO: move above to utils
 
+    pairs = []
+
     base_img_paths = random.choices(img_info_paths, k=num_examples)
     for imgp in base_img_paths:
         annot = json.load(open(imgp))['annotation']
         scene = random.choice(annot['scene'])
-        #tagged = nltk.pos_tag([scene])
         synset = nltk.corpus.wordnet.synsets(scene)[0]
         if synset.pos() == "n":
-            context = "This is a " + scene
+            context = "This is " + p.a(scene) + ". There is "
         else:
-            context = "This is a " + scene + " place"
-        print(context)
+            context = "This is " + p.a(scene) + " place. There is "
+
+        #obj = random.choice(annot['object'])
+        #obj_name = obj['raw_name']
+        #correct = context + p.a(obj_name) + "."
+
+        pair = FoilPair(context, imgp)
+        pairs.append(pair)
+
+    return pairs
