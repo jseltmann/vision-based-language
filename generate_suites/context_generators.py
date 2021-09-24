@@ -10,13 +10,38 @@ class FoilPair:
     """
     A pair of two text snippets, where in one of the snippets, 
     some part of the text was replaced by foil text.
+
+    Attributes
+    ----------
+    context : str
+        Basic context produced by context_generator.
+    orig_img : str
+        Path to annotations of original image.
+    foil_img : str
+        Path to annotations of image chosen to select foil word.
+    correct : dict
+        Condition in syntaxgym suite format containing the correct text.
+    foiled : dict
+        Condition in syntaxgym suite format containing the foiled text.
+    region_meta : dict
+        Region names in the format required by the sntaxgym json representation.
+    formula : str
+        Formula for syntaxgym to determine result for pair.
     """
     def __init__(self, context, orig_img):
         self.context = context
         self.orig_img = orig_img
         self.foil_img = None
-        self.correct = None
-        self.foiled = None
+
+        self.correct = dict()
+        self.correct["condition_name"] = "correct"
+        self.correct["regions"] = []
+        self.foiled = dict()
+        self.foiled["condition_name"] = "foiled"
+        self.foiled["regions"] = []
+
+        self.region_meta = None
+        self.formula = None
 
 def ade_thereis_generator(data_path, num_examples):
     """
@@ -58,9 +83,9 @@ def ade_thereis_generator(data_path, num_examples):
         scene = random.choice(annot['scene'])
         synset = nltk.corpus.wordnet.synsets(scene)[0]
         if synset.pos() == "n":
-            context = "This is " + p.a(scene) + ". There is "
+            context = "This is " + p.a(scene) + "."
         else:
-            context = "This is " + p.a(scene) + " place. There is "
+            context = "This is " + p.a(scene) + " place."
 
         #obj = random.choice(annot['object'])
         #obj_name = obj['raw_name']
