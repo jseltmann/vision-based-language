@@ -25,7 +25,7 @@ def generate_suite(pairs, save_path, suite_name, functions):
     suite = dict()
     suite["meta"] = dict()
     suite["meta"]["name"] = suite_name
-    suite["meta"]["metric"] = "average" # TODO: check with syntaxgym implementation
+    suite["meta"]["metric"] = "mean"
     suite["meta"]["comments"] = dict()
     suite["meta"]["comments"]["functions"] = functions
     suite["predictions"] = [{"type": "formula", "formula": pairs[0].formula}]
