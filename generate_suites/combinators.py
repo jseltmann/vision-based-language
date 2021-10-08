@@ -31,14 +31,14 @@ def ade_thereis_combinator(pairs):
         orig_obj = random.choice(orig_annot['object'])
         orig_obj_name = orig_obj['raw_name']
         correct_text = "There is " + p.a(orig_obj_name) + "."
-        pair.correct["regions"].append({"region_number":1, "content":pair.context})
+        pair.correct["regions"].append({"region_number":1, "content":pair.context[0]})
         pair.correct["regions"].append({"region_number":2, "content":correct_text})
 
         foil_annot = json.load(open(pair.foil_img))['annotation']
         foil_obj = random.choice(foil_annot['object'])
         foil_obj_name = foil_obj['raw_name']
         foiled_text = "There is " + p.a(foil_obj_name) + "."
-        pair.foiled["regions"].append({"region_number":1, "content":pair.context})
+        pair.foiled["regions"].append({"region_number":1, "content":pair.context[0]})
         pair.foiled["regions"].append({"region_number":2, "content":foiled_text})
 
         pair.region_meta = {"1": "context", "2": "thereis"}

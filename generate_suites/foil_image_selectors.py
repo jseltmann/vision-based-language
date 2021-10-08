@@ -1,7 +1,8 @@
 import os
 import random
 
-from context_generators import FoilPair
+import generation_utils as gu
+
 
 random.seed(0)
 
@@ -36,3 +37,13 @@ def ade_same_env_selector(pairs):
         pairs_with_foil.append(pair)
 
     return pairs_with_foil
+
+def cxc_sis_similar_selector(pairs):
+    """
+    Select the foil image to be similar to the original
+    based on the the CxC dataset. Requires the original
+    image to be part of MSCOCO 2014 val or train sets.
+    """
+    cxc_path = "/home/jseltmann/data/Crisscrossed-Captions/data"
+    
+    similarities = read_cxc(cxc_path, "sis_val.csv")
