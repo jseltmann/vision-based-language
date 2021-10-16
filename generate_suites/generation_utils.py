@@ -32,10 +32,10 @@ class FoilPair:
         Any further information to be passed between
         the parts of the suite generation pipeline.
     """
-    def __init__(self, context, orig_img, info=None):
-        self.context = context
+    def __init__(self, orig_img, foil_img, info={}):
+        self.context = None
         self.orig_img = orig_img
-        self.foil_img = None
+        self.foil_img = foil_img
 
         self.correct = dict()
         self.correct["condition_name"] = "correct"
@@ -47,7 +47,7 @@ class FoilPair:
         self.region_meta = None
         self.formula = None
 
-        self.info = None
+        self.info = info
 
 def get_ade_paths(ade_base_path):
     """
@@ -71,7 +71,7 @@ def get_ade_paths(ade_base_path):
 
     return img_info_paths
 
-def get_vg_image_ids(vg_base_path, mscoco_path, reverse=False):
+def get_vg_image_ids(config, reverse=False):
     """
     Get Visual Genome image ids for images
     that also have a coco_id, for use with CxC.
@@ -81,10 +81,8 @@ def get_vg_image_ids(vg_base_path, mscoco_path, reverse=False):
 
     Parameters
     ----------
-    vg_base_path : str
-        Path to Visual Genome dataset.
-    mscoco_path : str
-        Path to MSCOCO caption annotations.
+    config : Configparser
+        Read from config file.
     reverse : bool
         If true, give dict with coco_ids as keys.
 
@@ -94,12 +92,15 @@ def get_vg_image_ids(vg_base_path, mscoco_path, reverse=False):
         Dictionary mapping each VG id to an MSCOCO id.
     """
 
+    vg_base_path = config["Datasets"]["vg_path"]
+    mscoco_path = config["Datasets"]["mscoco_path"]
+
     with open(os.path.join(vg_base_path, "image_data.json")) as f:
         image_data = json.loads(f.read())
 
     with open(os.path.join(mscoco_path, "instances_val2014.json")) as cf:
         coco_data = json.loads(cf.read())
-        coco_ids = set([c['id'] for c in coco_data])
+        coco_ids = set([c['id'] for c in coco_data['annotations']])
 
     with_coco = [i for i in image_data if i['coco_id'] in coco_ids]
 
@@ -117,7 +118,8 @@ def _coco_fn2img_id(coco_fn):
     without_ending = without_pref.split(".")[0]
     while without_ending[0] == '0':
         without_ending = without_ending[1:]
-    return without_ending
+    image_id = int(without_ending)
+    return image_id
 
 def read_cxc(cxc_path, filename):
     """
@@ -132,10 +134,9 @@ def read_cxc(cxc_path, filename):
 
     Return
     ------
-    similarities: dict(str, dict(str, float))
-        Dictionary of similarity pairs. For each image_id,
-        contains a dictionary from the other image_ids for which
-        there is a similarity judgement to the similarity score.
+    similarities: dict((str,str), float))
+        Dictionary of of pairs of image ids and similarities
+        between the images in the pair.
     """
     
     similarities = dict()
@@ -148,12 +149,41 @@ def read_cxc(cxc_path, filename):
             img_id2 = _coco_fn2img_id(row[1])
             similarity = float(row[2])
 
-            if not img_id1 in similarities:
-                similarities[img_id1] = dict()
-            if not img_id2 in similarities:
-                similarities[img_id2] = dict()
-
-            similarities[img_id1][img_id2] = similarity
-            similarities[img_id2][img_id1] = similarity
+            similarities[(img_id1,img_id2)] = similarity
 
     return similarities
+
+
+def attrs_as_dict(config):
+    """
+    Get Visual Genome attributes as a dict,
+    with MSCoco image ids as keys and the
+    attribute information for each image as values.
+    """
+
+    vg_path = config["Datasets"]["vg_path"]
+    vg2coco = get_vg_image_ids(config)
+    with open(os.path.join(vg_path, "attributes.json")) as attr_file:
+        attrs = json.loads(attr_file.read())
+    attrs_as_dict = dict()
+    for img in attrs:
+        if not img['image_id'] in vg2coco:
+            continue
+        cocoid = vg2coco[img['image_id']]
+        attrs_as_dict[cocoid] = img
+
+    return attrs_as_dict
+
+
+def coco_as_dict(config):
+    """
+    Get MSCOCO captions as dict
+    with image_ids as keys.
+    """
+    coco_path = config["Datasets"]["mscoco_path"]
+    with open(os.path.join(coco_path, "captions_val2014.json")) as cf:
+        caption_data = json.loads(cf.read())['annotations']
+    coco_dict = dict()
+    for img in caption_data:
+        coco_dict[img['image_id']] = img['caption']
+    return coco_dict

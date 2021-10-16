@@ -41,6 +41,32 @@ def generate_suite(pairs, save_path, suite_name, functions):
     with open(save_path, "w") as suite_file:
         json.dump(suite, suite_file)
 
+
+def split(config, pairs):
+    """
+    Split off some pairs for fine-tuning.
+    """
+    train_split = float(config["General"]["trainsplit"])
+    cutoff = int(train_split * len(pairs))
+    train = pairs[:cutoff]
+    test = pairs[cutoff:]
+
+    finetune_path = config["General"]["finetune_path"]
+    train_sents = []
+    for pair in train:
+        corr_text = ""
+        for region in pair.correct["regions"]:
+            corr_text += region["content"]
+            if corr_text != "":
+                corr_text += " "
+        corr_text = corr_text.strip()
+        train_sents.append(corr_text)
+    with open(finetune_path, "w") as ff:
+        json.dump(train_sents, ff)
+
+    return test
+
+
 if __name__ == "__main__":
 
     if len(sys.argv) != 2:
@@ -59,11 +85,18 @@ if __name__ == "__main__":
     combinator_str = config["Functions"]["combinator"]
     combinator = getattr(com, combinator_str)
 
-    pairs = generator(config_path)
-    with_foil_imgs = selector(pairs)
-    combined = combinator(with_foil_imgs)
+    pairs = selector(config)
+    print("selected")
+    with_context = generator(pairs, config)
+    print("context")
+    combined = combinator(with_context, config)
+    print("combined")
+    #pairs = generator(config_path)
+    #with_foil_imgs = selector(pairs)
+    #combined = combinator(with_foil_imgs)
+    test = split(config, combined)
 
-    save_path = config["General"]["save_path"]
+    save_path = config["General"]["suite_path"]
     suite_name = config["General"]["suite_name"]
 
     generate_suite(combined, save_path, suite_name, 
