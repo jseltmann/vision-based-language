@@ -84,16 +84,20 @@ def caption_adj_combinator(pairs, config):
             earlier, later = new_pair.context
             if 'start' in new_pair.info and new_pair.info['start'] == True:
                 new_pair.foiled["regions"].append({"region_number":1, "content": ""})
-                r2 = attr.capitalize()
+                r2 = attr.capitalize().strip()
                 new_pair.foiled["regions"].append({"region_number":2, "content": r2})
             elif new_pair.info['indefinite']:
-                r1 = earlier + " " + p.a(attr)
+                r1 = earlier + " " + p.a(attr).strip()
                 new_pair.foiled["regions"].append({"region_number":1, "content": r1})
-                new_pair.foiled["regions"].append({"region_number":2, "content": attr})
+                r2 = attr.strip()
+                new_pair.foiled["regions"].append({"region_number":2, "content": r2})
             else:
-                new_pair.foiled["regions"].append({"region_number":1, "content": earlier})
-                new_pair.foiled["regions"].append({"region_number":2, "content": attr})
-            new_pair.foiled["regions"].append({"region_number":3, "content": later})
+                r1 = earlier.strip()
+                new_pair.foiled["regions"].append({"region_number":1, "content": r1})
+                r2 = earlier.strip()
+                new_pair.foiled["regions"].append({"region_number":2, "content": r2})
+            r3 = later.strip()
+            new_pair.foiled["regions"].append({"region_number":3, "content": r3})
             full_pairs.append(new_pair)
 
     return full_pairs

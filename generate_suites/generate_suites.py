@@ -33,6 +33,8 @@ def generate_suite(pairs, save_path, suite_name, functions):
     suite["items"] = []
 
     for i, pair in enumerate(pairs):
+        if i == 10:
+            break
         item = dict()
         item["item_number"] = i
         item["conditions"] = [pair.correct, pair.foiled]
