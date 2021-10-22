@@ -90,7 +90,7 @@ def main(args):
         tokenizer = tr.BertTokenizer.from_pretrained("bert-base-uncased")
     model = tr.BertForMaskedLM.from_pretrained("bert-base-uncased")
 
-    device = torch.device('cuda' if args.cuda else 'cpu')
+    device = torch.device('cuda')# if args.cuda else 'cpu')
     model.to(device)
     model.eval()
 
