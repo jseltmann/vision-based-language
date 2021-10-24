@@ -3,6 +3,7 @@ import random
 import configparser
 from tqdm import tqdm
 import json
+import pickle
 
 import generation_utils as gu
 import selection_conditions as sc
@@ -10,47 +11,91 @@ import selection_conditions as sc
 
 random.seed(0)
 
-#def ade_same_env_selector(pairs):
-#    """
-#    Select an image from the same ADE20k category as foil image.
-#
-#    Parameters
-#    ----------
-#    pairs : [FoilPair]
-#        List of foil pairs without foil images.
-#
-#    Returns
-#    -------
-#    pairs_with_foil : [FoilPair]
-#        Pairs with selected foil image.
-#    """
-#
-#    pairs_with_foil = []
-#    for pair in pairs:
-#        orig_path = pair.orig_img
-#        orig_fn = os.path.basename(orig_path)
-#        category_path = os.path.dirname(orig_path)
-#        
-#        imgs = os.listdir(category_path)
-#        imgs = [i for i in imgs if i.endswith("json")]
-#        imgs.remove(orig_fn)
-#        foil_img = random.choice(imgs)
-#        foil_path = os.path.join(category_path, foil_img)
-#
-#        pair.foil_img = foil_path
-#        pairs_with_foil.append(pair)
-#
-#    return pairs_with_foil
-#
-#def cxc_sis_similar_selector(pairs):
-#    """
-#    Select the foil image to be similar to the original
-#    based on the the CxC dataset. Requires the original
-#    image to be part of MSCOCO 2014 val or train sets.
-#    """
-#    cxc_path = "/home/jseltmann/data/Crisscrossed-Captions/data"
-#    
-#    similarities = read_cxc(cxc_path, "sis_val.csv")
+
+def ade_different_category_selector(config):
+    """
+    Select a pair of images from ADE which are
+    in a different outer category. E.g. home_or_hotel vs. transportation.
+
+    Parameters
+    ----------
+    config : Configparser
+        Read from config file
+
+    Return
+    ------
+    pairs : [Pairs]
+        FoilPairs with selected images.
+    """
+
+    ade_path = config["Datasets"]["ade_path"]
+    with open(os.path.join(ade_path, "index_ade20k.pkl"), "rb") as indf:
+        index = pickle.load(ade_path)
+
+    num_examples = config["General"]["num_examples"]
+    selected_fns = random.choices(index['filename'], k=num_examples)
+
+    train_path = os.path.join(ade_path, "images/ADE/training/")
+    categories = set(os.path.listdir(train_path))
+
+    pairs = []
+    for fn in selected_fns:
+        path = index["folder"]
+        category = path.split("/")[-2]
+        new_cat = random.choice([c for c in categories if c != category])
+        cat_path = os.path.join(train_path, new_cat)
+        scenes = os.listdir(cat_path)
+        scene = random.choice(scenes)
+        scene_path = os.path.join(cat_path, scene)
+        foil_fns = [fn for fn in os.listdir(scene_path) if fn.endswith("jpg")]
+        foil_fn = random.choice(foil_fns)
+        pair = FoilPair(fn, foil_fn)
+        pairs.append(pair)
+    return pairs
+
+
+def ade_different_scene_selector(config):
+    """
+    Select a pair of images from ADE which are
+    in a different scene type, but the same outer category.
+    E.g., "classroom" and "library__indoor" under "cultural".
+
+    Parameters
+    ----------
+    config : Configparser
+        Read from config file
+
+    Return
+    ------
+    pairs : [Pairs]
+        FoilPairs with selected images.
+    """
+
+    ade_path = config["Datasets"]["ade_path"]
+    with open(os.path.join(ade_path, "index_ade20k.pkl"), "rb") as indf:
+        index = pickle.load(ade_path)
+
+    num_examples = config["General"]["num_examples"]
+    selected_fns = random.choices(index['filename'], k=num_examples)
+
+    train_path = os.path.join(ade_path, "images/ADE/training/")
+
+    pairs = []
+    for fn in selected_fns:
+        path = index["folder"]
+        category = path.split("/")[-2]
+        scene = path.split("/")[-1]
+        cat_path = os.path.join(train_path, cat)
+        scenes = [d for d in os.listdir(cat_path) if d!=scene]
+        foil_scene = random.choice(scenes)
+        foil_scene_path = os.path.join(cat_path, scene)
+        foil_fns = [fn for fn in os.listdir(foil_scene_path) if fn.endswith("jpg")]
+        foil_fn = random.choice(foil_fns)
+        pair = FoilPair(fn, foil_fn)
+        pairs.append(pair)
+    return pairs
+
+
 
 def cxc_similar_selector(config):
     """
@@ -85,7 +130,6 @@ def cxc_similar_selector(config):
     """
 
     cxc_path = config["Datasets"]["cxc_path"]
-    num_examples = int(config["General"]["num_examples"])
     cutoff = float(config["General"]["cutoff"])
     similar = bool(config["General"]["similar"])
     cxc_subset = config["Datasets"]["cxc_subset"]
