@@ -49,27 +49,6 @@ class FoilPair:
 
         self.info = info
 
-def get_ade_paths(ade_base_path):
-    """
-    Get paths of annotations of the individual images in ADE20k.
-
-    Parameters
-    ----------
-    ade_base_path : str
-        Path to ADE20k data set.
-    """
-
-    environments = os.listdir(ade_base_path)
-    env_paths = [os.path.join(ade_base_path, e) for e in environments]
-    specific_env_paths = []
-    for ep in env_paths:
-        specific_envs = os.listdir(ep)
-        specific_env_paths += [os.path.join(ep, spe) for spe in specific_envs]
-    img_info_paths = []
-    for sep in specific_env_paths:
-        img_info_paths += [os.path.join(sep, ip) for ip in os.listdir(sep) if ip.endswith("json")]
-
-    return img_info_paths
 
 def get_vg_image_ids(config, reverse=False):
     """
@@ -154,23 +133,27 @@ def read_cxc(cxc_path, filename):
     return similarities
 
 
-def attrs_as_dict(config):
+def attrs_as_dict(config, keys="coco"):
     """
     Get Visual Genome attributes as a dict,
-    with MSCoco image ids as keys and the
+    with MSCoco or Visual Genome image ids as keys and the
     attribute information for each image as values.
     """
 
     vg_path = config["Datasets"]["vg_path"]
-    vg2coco = get_vg_image_ids(config)
+    if keys == "coco":
+        vg2coco = get_vg_image_ids(config)
     with open(os.path.join(vg_path, "attributes.json")) as attr_file:
         attrs = json.loads(attr_file.read())
     attrs_as_dict = dict()
     for img in attrs:
         if not img['image_id'] in vg2coco:
             continue
-        cocoid = vg2coco[img['image_id']]
-        attrs_as_dict[cocoid] = img
+        if keys == "coco":
+            cocoid = vg2coco[img['image_id']]
+            attrs_as_dict[cocoid] = img
+        else:
+            attrs_as_dict[img'image_id'] = img
 
     return attrs_as_dict
 

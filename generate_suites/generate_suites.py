@@ -33,8 +33,6 @@ def generate_suite(pairs, save_path, suite_name, functions):
     suite["items"] = []
 
     for i, pair in enumerate(pairs):
-        if i == 10:
-            break
         item = dict()
         item["item_number"] = i
         item["conditions"] = [pair.correct, pair.foiled]
@@ -54,7 +52,8 @@ def split(config, pairs):
     test = pairs[cutoff:]
 
     finetune_path = config["General"]["finetune_path"]
-    train_sents = []
+    corr_sents = []
+    incorr_sents = []
     for pair in train:
         corr_text = ""
         for region in pair.correct["regions"]:
@@ -62,11 +61,21 @@ def split(config, pairs):
             if corr_text != "":
                 corr_text += " "
         corr_text = corr_text.strip()
-        train_sents.append(corr_text)
-    with open(finetune_path, "w") as ff:
-        json.dump(train_sents, ff)
+        corr_sents.append(corr_text)
 
-    return test
+        incorr_text = ""
+        for region in pair.foiled["regions"]:
+            incorr_text += region["content"]
+            if incorr_text != "":
+                incorr_text += " "
+        incorr_text = corr_text.strip()
+        incorr_sents.append(incorr_text)
+
+    data_dict = {True: corr_sents, False: incorr_sents}
+    with open(finetune_path, "w") as ff:
+        json.dump(data_dict, ff)
+
+    return test, train
 
 
 if __name__ == "__main__":
@@ -93,13 +102,15 @@ if __name__ == "__main__":
     print("context")
     combined = combinator(with_context, config)
     print("combined")
-    #pairs = generator(config_path)
-    #with_foil_imgs = selector(pairs)
-    #combined = combinator(with_foil_imgs)
-    test = split(config, combined)
+    test, train = split(config, combined)
 
     save_path = config["General"]["suite_path"]
     suite_name = config["General"]["suite_name"]
 
-    generate_suite(combined, save_path, suite_name, 
+    generate_suite(test, save_path, suite_name, 
+            (generator_str, selector_str, combinator_str))
+
+
+    ### save train data as suite for debugging
+    generate_suite(train, save_path+"_train", suite_name, 
             (generator_str, selector_str, combinator_str))

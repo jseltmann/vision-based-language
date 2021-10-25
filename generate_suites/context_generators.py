@@ -4,6 +4,7 @@ import json
 import inflect
 import configparser
 import spacy
+import pickle
 
 #import stanza
 #import nltk
@@ -12,7 +13,7 @@ import generation_utils as gu
 
 random.seed(0)
 
-def ade_thereis_generator(config_path):
+def ade_thereis_generator(pairs, config):
     """
     Generate context based on ADE20k dataset.
     Each examples gives the scene name and an object contained in it,
@@ -20,9 +21,11 @@ def ade_thereis_generator(config_path):
 
     Parameters
     ----------
-    config_path : str
-        Path to config file containing information about
-        data to be used and the examples to be created.
+    pairs : [FoilPair]
+        List of pairs produced by selector function,
+        which contain orig and foil image ids.
+    config : Configparser
+        Containing configuration.
 
     Return
     ------
@@ -30,21 +33,18 @@ def ade_thereis_generator(config_path):
         List of FoilPairs with the foil examples not yet set.
     """
 
-    config = configparser.ConfigParser()
-    config.read(config_path)
-    dataset_name = config["General"]["dataset"]
-    data_path = config["Datasets"][dataset_name]
-    num_examples = int(config["General"]["num_examples"])
-
     p = inflect.engine()
-    pairs = []
-    img_info_paths = gu.get_ade_paths(data_path)
-
     nlp = spacy.load("en_core_web_sm")
 
-    base_img_paths = random.choices(img_info_paths, k=num_examples)
-    for imgp in base_img_paths:
-        annot = json.load(open(imgp))['annotation']
+    ade_path = config["Datasets"]["ade_path"]
+    with open(os.path.join(ade_path, "index_ade20k.pkl"), "rb") as indf:
+        index = pickle.load(indf)
+
+    for pair in pairs:
+        orig_dir = index["folder"][pair.orig_img]
+        json_name = pair.orig_img.split(".")[0] + ".json"
+        json_path = os.path.join(orig_dir, json_name)
+        annot = json.load(open(json_path))['annotation']
         scene = random.choice(annot['scene'])
         doc = nlp(scene)
         if doc[0].pos_ == "NOUN":
@@ -52,13 +52,12 @@ def ade_thereis_generator(config_path):
         else:
             context = ("This is " + p.a(scene) + " place.",)
 
-        pair = gu.FoilPair(context, imgp)
-        pairs.append(pair)
+        pair.context = context
 
     return pairs
 
 
-def vg_attribute_generator(config_path):
+def vg_attribute_generator(pairs, config):
     """
     Generate context based on Visual Genome dataset.
     Each examples gives an object with an attribute,
@@ -66,9 +65,11 @@ def vg_attribute_generator(config_path):
 
     Parameters
     ----------
-    config_path : str
-        Path to config file containing information about
-        data to be used and the examples to be created.
+    pairs : [FoilPair]
+        List of pairs produced by selector function,
+        which contain orig and foil image ids.
+    config : Configparser
+        Containing configuration.
 
     Return
     ------
@@ -76,32 +77,18 @@ def vg_attribute_generator(config_path):
         List of FoilPairs with the foil examples not yet set.
     """
 
-    config = configparser.ConfigParser()
-    config.read(config_path)
-    dataset_name = config["General"]["dataset"]
-    vg_path = config["Datasets"][dataset_name]
-    num_examples = int(config["General"]["num_examples"])
+    attrs = gu.attrs_as_dict(config, keys="visgen")
 
-    vg_attr_path = os.path.join(vg_path, "attributes.json")
-    with open(vg_attr_path) as vg_attr_f:
-        attr_data = json.loads(vg_attr_f.read())
-
-    coco_path = config["Datasets"]["mscoco_path"]
-
-    vg2coco = gu.get_vg_image_ids(vg_path, coco_path)
-    attr_data = [ad for ad in attr_data if ad['image_id'] in vg2coco]
-
-    pairs = []
-
-    base_imgs = random.choices(attr_data, k=num_examples)
-    for img in base_imgs:
-        obj = random.choice(img['attributes'])
-        context = ("There is ", obj["synsets"][0].split(".")[0])
-        coco_id = vg2coco[imag['image_id']]
-        pair = gu.FoilPair(context, coco_id)
-        pairs.append(pair)
+    for pair in pairs:
+        with_attrs = [o for o in img['attributes'] if o['attributes'] != 0]
+        obj = random.choice(with_attrs)
+        word = obj["synsets"][0].split(".")[0]
+        context = ("There is ", word)
+        pair.context = context
+        pair.info["orig_object"] = obj
 
     return pairs
+
 
 def caption_adj_generator(pairs, config):
     """
@@ -148,7 +135,7 @@ def caption_adj_generator(pairs, config):
         else:
             info = {'indefinite': False}
         later = doc[adj_pos+1:]
-        
+
         context = (earlier.text, later.text)
         pair.context = context
         pair.info = info
