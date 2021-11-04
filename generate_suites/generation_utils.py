@@ -92,6 +92,25 @@ def get_vg_image_ids(config, reverse=False):
     return vg2coco
 
 
+def ade_fn2index(fn):
+    """
+    Split an ADE filename to get the index
+    of the file in the lists of the index file.
+    """
+    fn = fn.split(".")[0]
+    number = fn.split("_")[-1]
+    number = int(number) - 1
+    return number
+
+
+def get_ade_json_path(fn, data_path, index):
+    orig_id = ade_fn2index(fn)
+    orig_dir = os.path.join(data_path, index["folder"][orig_id])
+    json_name = fn.split(".")[0] + ".json"
+    json_path = os.path.join(orig_dir, json_name)
+    return json_path
+
+
 def _coco_fn2img_id(coco_fn):
     without_pref = coco_fn.split("_")[-1]
     without_ending = without_pref.split(".")[0]
@@ -147,13 +166,13 @@ def attrs_as_dict(config, keys="coco"):
         attrs = json.loads(attr_file.read())
     attrs_as_dict = dict()
     for img in attrs:
-        if not img['image_id'] in vg2coco:
-            continue
         if keys == "coco":
+            if not img['image_id'] in vg2coco:
+                continue
             cocoid = vg2coco[img['image_id']]
             attrs_as_dict[cocoid] = img
         else:
-            attrs_as_dict[img'image_id'] = img
+            attrs_as_dict[img['image_id']] = img
 
     return attrs_as_dict
 

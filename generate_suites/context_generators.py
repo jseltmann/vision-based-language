@@ -5,9 +5,9 @@ import inflect
 import configparser
 import spacy
 import pickle
-
-#import stanza
-#import nltk
+from tqdm import tqdm
+import codecs
+import copy
 
 import generation_utils as gu
 
@@ -37,14 +37,14 @@ def ade_thereis_generator(pairs, config):
     nlp = spacy.load("en_core_web_sm")
 
     ade_path = config["Datasets"]["ade_path"]
+    data_path = "/".join(ade_path.split("/")[:-1])
     with open(os.path.join(ade_path, "index_ade20k.pkl"), "rb") as indf:
         index = pickle.load(indf)
 
-    for pair in pairs:
-        orig_dir = index["folder"][pair.orig_img]
-        json_name = pair.orig_img.split(".")[0] + ".json"
-        json_path = os.path.join(orig_dir, json_name)
-        annot = json.load(open(json_path))['annotation']
+    for pair in tqdm(pairs):
+        json_path = gu.get_ade_json_path(pair.orig_img, data_path, index)
+        with codecs.open(json_path, "r", "ISO-8859-1") as jfile:
+            annot = json.load(jfile)['annotation']
         scene = random.choice(annot['scene'])
         doc = nlp(scene)
         if doc[0].pos_ == "NOUN":
@@ -77,17 +77,47 @@ def vg_attribute_generator(pairs, config):
         List of FoilPairs with the foil examples not yet set.
     """
 
-    attrs = gu.attrs_as_dict(config, keys="visgen")
+    attrs = gu.attrs_as_dict(config, keys="coco")
+    new_pairs = []
 
     for pair in pairs:
-        with_attrs = [o for o in img['attributes'] if o['attributes'] != 0]
-        obj = random.choice(with_attrs)
-        word = obj["synsets"][0].split(".")[0]
-        context = ("There is ", word)
-        pair.context = context
-        pair.info["orig_object"] = obj
+        img = attrs[pair.orig_img]
+        with_attrs = [o for o in img['attributes'] if 'attributes' in o]
+        for obj in with_attrs:
+            if len(obj['synsets']) == 0:
+                continue
+            word = random.choice(obj['synsets']).split(".")[0]
+            context = ("There is ", word)
+            new_pair = copy.deepcopy(pair)
+            new_pair.context = context
+            new_pair.info["orig_object"] = obj
+            new_pairs.append(new_pair)
 
-    return pairs
+    return new_pairs
+
+
+def relationship_subj_generator(pairs, config):
+    """
+    Use a relationship from Visual Genome as basis
+    for the pair, inserting the foil word for the
+    subject of the relation.
+    
+    Parameters
+    ----------
+    pairs : [FoilPair]
+        List of pairs produced by selector function,
+        which contain orig and foil image ids.
+    config : Configparser
+        Containing configuration.
+
+    Return
+    ------
+    pairs : [FoilPair]
+        List of FoilPairs with the foil examples not yet set.
+    """
+
+    #rels = gu.rels_
+    #for pair in pairs:
 
 
 def caption_adj_generator(pairs, config):

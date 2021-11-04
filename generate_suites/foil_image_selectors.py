@@ -30,27 +30,41 @@ def ade_different_category_selector(config):
 
     ade_path = config["Datasets"]["ade_path"]
     with open(os.path.join(ade_path, "index_ade20k.pkl"), "rb") as indf:
-        index = pickle.load(ade_path)
+        index = pickle.load(indf)
 
-    num_examples = config["General"]["num_examples"]
-    selected_fns = random.choices(index['filename'], k=num_examples)
+    num_examples = int(config["General"]["num_examples"])
 
     train_path = os.path.join(ade_path, "images/ADE/training/")
-    categories = set(os.path.listdir(train_path))
+    categories = set(os.listdir(train_path))
 
     pairs = []
-    for fn in selected_fns:
-        path = index["folder"]
+    fns = list(enumerate(index['filename']))
+    selected_inds = set()
+    while len(selected_inds) < num_examples:
+        i, fn = random.choice(fns)
+        if i in selected_inds:
+            continue
+        if not "train" in fn:
+            continue
+        selected_inds.add(i)
+        path = index["folder"][i]
         category = path.split("/")[-2]
-        new_cat = random.choice([c for c in categories if c != category])
-        cat_path = os.path.join(train_path, new_cat)
-        scenes = os.listdir(cat_path)
-        scene = random.choice(scenes)
-        scene_path = os.path.join(cat_path, scene)
-        foil_fns = [fn for fn in os.listdir(scene_path) if fn.endswith("jpg")]
-        foil_fn = random.choice(foil_fns)
-        pair = FoilPair(fn, foil_fn)
+        found = False
+        while not found:
+            new_cat = random.choice([c for c in categories if c != category])
+            cat_path = os.path.join(train_path, new_cat)
+            scenes = os.listdir(cat_path)
+            scene = random.choice(scenes)
+            scene_path = os.path.join(cat_path, scene)
+            foil_fns = [fn for fn in os.listdir(scene_path) if fn.endswith("jpg")]
+            foil_fns = [fn for fn in foil_fns if "train" in fn]
+            if foil_fns == []:
+                continue
+            foil_fn = random.choice(foil_fns)
+            found = True
+        pair = gu.FoilPair(fn, foil_fn)
         pairs.append(pair)
+
     return pairs
 
 
@@ -94,7 +108,6 @@ def ade_different_scene_selector(config):
         pair = FoilPair(fn, foil_fn)
         pairs.append(pair)
     return pairs
-
 
 
 def cxc_similar_selector(config):

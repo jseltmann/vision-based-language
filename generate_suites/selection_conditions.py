@@ -60,3 +60,49 @@ def img_with_attr(pair, config, info=None):
             has_attr = True
             break
     return has_attr
+
+
+
+def both_img_with_attr(pair, config, info=None):
+    """
+    Return True if both images are annotated with attributes.
+    """
+
+    (i1id, i2id) = pair
+
+    vg_path = config["Datasets"]["vg_path"]
+    mscoco_path = config["Datasets"]["mscoco_path"]
+
+    attrs_as_dict = info['attrs']
+    vg2coco = info['vg2coco']
+
+    if not i2id in attrs_as_dict:
+        return False
+    else:
+        img = attrs_as_dict[i2id]
+
+    has_attr = False
+    for obj in img['attributes']:
+        if not 'attributes' in obj:
+            continue
+        if len(obj['attributes']) > 0:
+            has_attr = True
+            break
+
+    if not has_attr:
+        return False
+
+    if not i1id in attrs_as_dict:
+        return False
+    else:
+        img = attrs_as_dict[i1id]
+
+    has_attr = False
+    for obj in img['attributes']:
+        if not 'attributes' in obj:
+            continue
+        if len(obj['attributes']) > 0:
+            has_attr = True
+            break
+
+    return has_attr
