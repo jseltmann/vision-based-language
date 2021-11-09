@@ -163,14 +163,19 @@ def cxc_similar_selector(config):
     found = 0
 
     vg2coco = gu.get_vg_image_ids(config)
-    attrs_as_dict = gu.attrs_as_dict(config)
     coco_dict = gu.coco_as_dict(config)
+    attrs_as_dict = gu.vg_as_dict(config, "attributes", keys="coco")
+    rels_dict = gu.vg_as_dict(config, "relationships", keys="coco")
+    objs_dict = gu.vg_as_dict(config, "objects", keys="coco")
 
     info = {'attrs': attrs_as_dict,
             'vg2coco': vg2coco,
-            'coco_captions': coco_dict}
+            'coco_captions': coco_dict,
+            'rels': rels_dict,
+            'objs': objs_dict}
 
     for idpair in tqdm(idpairs):
+    #for idpair in idpairs:
         sort_out = False
         for cond_fn in cond_fns:
             if cond_fn(idpair, config, info=info) == False:
@@ -180,8 +185,12 @@ def cxc_similar_selector(config):
         if sort_out == True:
             continue
         found += 1
+        if found == 10:
+            continue
 
         i1id, i2id = idpair
+        #i1id = vg2coco[i1id]
+        #i2id = vg2coco[i2id]
         pair = gu.FoilPair(i1id, i2id)
         pairs.append(pair)
 

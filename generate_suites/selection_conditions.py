@@ -33,6 +33,7 @@ def caption_with_adj(pair, config, info=None):
     else:
         return False
 
+
 def img_with_attr(pair, config, info=None):
     """
     Return True if at least one object in
@@ -106,3 +107,34 @@ def both_img_with_attr(pair, config, info=None):
             break
 
     return has_attr
+
+
+def img_with_rel(pair, config, info=None):
+    """
+    Return True if the first image is annotated
+    with at leat one relation between objects.
+    """
+    rels = info["rels"]
+    i1id = pair[0]
+    if not i1id in rels:
+        return False
+    if len(rels[i1id]["relationships"]) < 1:
+        return False
+    return True
+
+def with_obj_2(pair, config, info=None):
+    """
+    Return True if the second image is annotated
+    with at least one object.
+    """
+    objs = info["objs"]
+    i2id = pair[1]
+    if not i2id in objs:# or not 'relationships' in objs[i2id]:
+        #print("a", end="")
+        return False
+    #if len(objs[i2id]["relationships"]) < 1:
+    if len(objs[i2id]["objects"]) < 1:
+        #print("b", end="")
+        return False
+    #print("c", end="")
+    return True

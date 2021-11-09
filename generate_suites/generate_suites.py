@@ -97,11 +97,14 @@ if __name__ == "__main__":
     combinator = getattr(com, combinator_str)
 
     pairs = selector(config)
+    print(len(pairs))
     print("selected")
     with_context = generator(pairs, config)
+    print(len(with_context))
     print("context")
     combined = combinator(with_context, config)
     print("combined")
+    print(len(combined))
     test, train = split(config, combined)
 
     save_path = config["General"]["suite_path"]
@@ -109,7 +112,6 @@ if __name__ == "__main__":
 
     generate_suite(test, save_path, suite_name, 
             (generator_str, selector_str, combinator_str))
-
 
     ### save train data as suite for debugging
     generate_suite(train, save_path+"_train", suite_name, 

@@ -57,6 +57,18 @@ def ade_thereis_generator(pairs, config):
     return pairs
 
 
+#def qa_base_generator(pairs, config):
+#    """
+#    Use question as context.
+#    """
+#
+#    qa_pairs = gu.vg_as_dict(config, "questions", keys="coco")
+#
+#    for pair in pairs:
+#        orig_id = 
+
+
+
 def vg_attribute_generator(pairs, config):
     """
     Generate context based on Visual Genome dataset.
@@ -96,11 +108,11 @@ def vg_attribute_generator(pairs, config):
     return new_pairs
 
 
-def relationship_subj_generator(pairs, config):
+def relationship_obj_generator(pairs, config):
     """
     Use a relationship from Visual Genome as basis
     for the pair, inserting the foil word for the
-    subject of the relation.
+    object of the relation.
     
     Parameters
     ----------
@@ -116,8 +128,26 @@ def relationship_subj_generator(pairs, config):
         List of FoilPairs with the foil examples not yet set.
     """
 
-    #rels = gu.rels_
-    #for pair in pairs:
+    #rels = gu.rels_as_dict(config)
+    rels = gu.vg_as_dict(config, "relationships")
+    new_pairs = []
+    for pair in pairs:
+        orig_rels = rels[pair.orig_img]
+        for rel in orig_rels["relationships"]:
+            if 'name' in rel['subject']:
+                subj = rel['subject']['name']
+            else:
+                subj = rel['subject']['names'][0]
+            pred = rel['predicate']
+            context = (subj + " " + pred,)
+            new_pair = copy.deepcopy(pair)
+            new_pair.context = context
+            if 'name' in rel['object']:
+                new_pair.info = {"orig_obj": rel['object']['name']}
+            else:
+                new_pair.info = {"orig_obj": rel['object']['names'][0]}
+            new_pairs.append(new_pair)
+    return new_pairs
 
 
 def caption_adj_generator(pairs, config):

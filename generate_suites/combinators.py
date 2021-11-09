@@ -133,3 +133,35 @@ def caption_adj_combinator(pairs, config):
             full_pairs.append(new_pair)
 
     return full_pairs
+
+
+def relationship_obj_combinator(pairs, config):
+    """
+    Counterpart to relationship_obj_generator.
+    """
+
+    objs = gu.vg_as_dict(config, "objects")
+
+    full_pairs = []
+    for pair in pairs:
+        foil_objs = objs[pair.foil_img]['objects']
+        for obj in foil_objs:
+            new_pair = copy.deepcopy(pair)
+
+            r1 = pair.context[0]
+            new_pair.correct["regions"].append({"region_number": 1, "content": r1})
+            r2 = pair.info["orig_obj"]
+            new_pair.correct["regions"].append({"region_number": 2, "content": r2})
+
+            new_pair.foiled["regions"].append({"region_number": 1, "content": r1})
+            if "name" in obj:
+                r2 = obj["name"]
+            else:
+                r2 = obj["names"][0]
+            new_pair.foiled["regions"].append({"region_number": 2, "content": r2})
+
+            new_pair.region_meta = {"1": "context", "2": "object"}
+            new_pair.formula = "(*;%foiled%) > (*;%correct%)"
+            full_pairs.append(new_pair)
+
+    return full_pairs

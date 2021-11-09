@@ -177,6 +177,35 @@ def attrs_as_dict(config, keys="coco"):
     return attrs_as_dict
 
 
+def vg_as_dict(config, filename, keys="coco"):
+    """
+    Get specific Visual Genome file as a dict,
+    with MSCoco or Visual Genome image ids as keys and the
+    attribute information for each image as values.
+    """
+
+    vg_path = config["Datasets"]["vg_path"]
+    if keys == "coco":
+        vg2coco = get_vg_image_ids(config)
+    if filename.endswith("json"):
+        with open(os.path.join(vg_path, filename)) as rel_file:
+            info = json.loads(rel_file.read())
+    else:
+        with open(os.path.join(vg_path, filename+".json")) as rel_file:
+            info = json.loads(rel_file.read())
+    vg_as_dict = dict()
+    for img in info:
+        if keys == "coco":
+            if not img['image_id'] in vg2coco:
+                continue
+            cocoid = vg2coco[img['image_id']]
+            vg_as_dict[cocoid] = img
+        else:
+            vg_as_dict[img['image_id']] = img
+
+    return vg_as_dict
+
+
 def coco_as_dict(config):
     """
     Get MSCOCO captions as dict
