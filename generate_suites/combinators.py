@@ -165,3 +165,26 @@ def relationship_obj_combinator(pairs, config):
             full_pairs.append(new_pair)
 
     return full_pairs
+
+
+def qa_base_combinator(pairs, config):
+    """
+    Counterpart to qa_base_generator.
+    """
+
+    qas = gu.vg_as_dict(config, "question_answers.json", keys="visgen")
+
+    full_pairs = []
+    for pair in pairs:
+        foil_qas = qas[pair.foil_img]['qas']
+        foil_qas = random.choices(foil_qas, k=10)
+        for qa in foil_qas:
+            full_pair = copy.deepcopy(pair)
+            r1 = pair.context
+            full_pair.foiled["regions"].append({"region_number":1, "content": r1})
+            r2 = qa["answer"]
+            full_pair.foiled["regions"].append({"region_number":2, "content": r2})
+
+            full_pairs.append(full_pair)
+
+    return full_pairs

@@ -170,13 +170,17 @@ def vg_as_dict(config, filename, keys="coco"):
             info = json.loads(rel_file.read())
     vg_as_dict = dict()
     for img in info:
+        if 'image_id' in img:
+            img_id = img['image_id']
+        else:
+            img_id = img['id']
         if keys == "coco":
-            if not img['image_id'] in vg2coco:
+            if not img_id in vg2coco:
                 continue
-            cocoid = vg2coco[img['image_id']]
+            cocoid = vg2coco[img_id]
             vg_as_dict[cocoid] = img
         else:
-            vg_as_dict[img['image_id']] = img
+            vg_as_dict[img_id] = img
 
     return vg_as_dict
 

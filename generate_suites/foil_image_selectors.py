@@ -147,7 +147,10 @@ def cxc_similar_selector(config):
     similar = bool(config["General"]["similar"])
     cxc_subset = config["Datasets"]["cxc_subset"]
     conditions = config["General"]["conditions"].split("\n")
-    cond_fns = [getattr(sc, cond) for cond in conditions]
+    if conditions[0] != '':
+        cond_fns = [getattr(sc, cond) for cond in conditions]
+    else:
+        cond_fns = []
 
     similarities = gu.read_cxc(cxc_path, cxc_subset)
 
@@ -168,12 +171,15 @@ def cxc_similar_selector(config):
     attrs_as_dict = gu.vg_as_dict(config, "attributes", keys="coco")
     rels_dict = gu.vg_as_dict(config, "relationships", keys="coco")
     objs_dict = gu.vg_as_dict(config, "objects", keys="coco")
+    qas = gu.vg_as_dict(config, "question_answers", keys="coco")
 
     info = {'attrs': attrs_as_dict,
             'vg2coco': vg2coco,
+            'coco2vg': coco2vg,
             'coco_captions': coco_dict,
             'rels': rels_dict,
-            'objs': objs_dict}
+            'objs': objs_dict,
+            'qas': qas}
 
     for idpair in tqdm(idpairs):
     #for idpair in idpairs:

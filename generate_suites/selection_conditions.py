@@ -138,3 +138,32 @@ def with_obj_2(pair, config, info=None):
         return False
     #print("c", end="")
     return True
+
+
+def pair_in_vg(pair, config, info=None):
+    """
+    Return True iff both images with coco ids
+    are also contained in VisualGenome.
+    """
+    c1id = pair[0]
+    c2id = pair[1]
+
+    coco2vg = info["coco2vg"]
+    if c1id in coco2vg and c2id in coco2vg:
+        return True
+    else:
+        return False
+
+def have_questions(pair, config, info=None):
+    """
+    Return True iff both images are annotated with questions.
+    """
+    qas = info["qas"]
+
+    c1id = pair[0]
+    if qas[c1id]['qas'] == []:
+        return False
+    c2id = pair[1]
+    if qas[c2id]['qas'] == []:
+        return False
+    return True

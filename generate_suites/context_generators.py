@@ -57,16 +57,32 @@ def ade_thereis_generator(pairs, config):
     return pairs
 
 
-#def qa_base_generator(pairs, config):
-#    """
-#    Use question as context.
-#    """
-#
-#    qa_pairs = gu.vg_as_dict(config, "questions", keys="visgen")
-#
-#    for pair in pairs:
-#        orig_id = 
+def qa_base_generator(pairs, config):
+    """
+    Use question as context.
+    """
 
+    qa_pairs = gu.vg_as_dict(config, "question_answers", keys="visgen")
+
+    new_pairs = []
+    for pair in pairs:
+        orig_id = pair.orig_img
+        qas = qa_pairs[orig_id]['qas']
+        qas = random.choices(qas, k=10)
+        for qa in qas:
+            new_pair = copy.deepcopy(pair)
+            new_pair.context = qa["question"]
+
+            r1 = qa["question"]
+            new_pair.correct["regions"].append({"region_number":1, "content": r1})
+            r2 = qa["answer"]
+            new_pair.correct["regions"].append({"region_number":2, "content": r2})
+
+            new_pair.region_meta = {"1": "question", "2": "answer"}
+            new_pair.formula = "(*;%foiled%) > (*;%correct%)"
+            new_pairs.append(new_pair)
+
+    return new_pairs
 
 
 def vg_attribute_generator(pairs, config):
