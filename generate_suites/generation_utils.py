@@ -152,31 +152,6 @@ def read_cxc(cxc_path, filename):
     return similarities
 
 
-def attrs_as_dict(config, keys="coco"):
-    """
-    Get Visual Genome attributes as a dict,
-    with MSCoco or Visual Genome image ids as keys and the
-    attribute information for each image as values.
-    """
-
-    vg_path = config["Datasets"]["vg_path"]
-    if keys == "coco":
-        vg2coco = get_vg_image_ids(config)
-    with open(os.path.join(vg_path, "attributes.json")) as attr_file:
-        attrs = json.loads(attr_file.read())
-    attrs_as_dict = dict()
-    for img in attrs:
-        if keys == "coco":
-            if not img['image_id'] in vg2coco:
-                continue
-            cocoid = vg2coco[img['image_id']]
-            attrs_as_dict[cocoid] = img
-        else:
-            attrs_as_dict[img['image_id']] = img
-
-    return attrs_as_dict
-
-
 def vg_as_dict(config, filename, keys="coco"):
     """
     Get specific Visual Genome file as a dict,

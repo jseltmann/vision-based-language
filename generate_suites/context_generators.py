@@ -62,7 +62,7 @@ def ade_thereis_generator(pairs, config):
 #    Use question as context.
 #    """
 #
-#    qa_pairs = gu.vg_as_dict(config, "questions", keys="coco")
+#    qa_pairs = gu.vg_as_dict(config, "questions", keys="visgen")
 #
 #    for pair in pairs:
 #        orig_id = 
@@ -89,7 +89,7 @@ def vg_attribute_generator(pairs, config):
         List of FoilPairs with the foil examples not yet set.
     """
 
-    attrs = gu.attrs_as_dict(config, keys="coco")
+    attrs = gu.vg_as_dict(config, "attributes", keys="visgen")
     new_pairs = []
 
     for pair in pairs:
@@ -128,8 +128,7 @@ def relationship_obj_generator(pairs, config):
         List of FoilPairs with the foil examples not yet set.
     """
 
-    #rels = gu.rels_as_dict(config)
-    rels = gu.vg_as_dict(config, "relationships")
+    rels = gu.vg_as_dict(config, "relationships", keys="visgen")
     new_pairs = []
     for pair in pairs:
         orig_rels = rels[pair.orig_img]

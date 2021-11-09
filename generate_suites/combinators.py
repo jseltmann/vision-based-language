@@ -66,7 +66,7 @@ def vg_attribute_combinator(pairs, config):
     For context of type "There is an [attribute] thing".
     """
 
-    attrs = gu.attrs_as_dict(config)
+    attrs = gu.vg_as_dict(config, "attributes", keys="visgen")
     p = inflect.engine()
     new_pairs = []
 
@@ -140,7 +140,7 @@ def relationship_obj_combinator(pairs, config):
     Counterpart to relationship_obj_generator.
     """
 
-    objs = gu.vg_as_dict(config, "objects")
+    objs = gu.vg_as_dict(config, "objects", keys="visgen")
 
     full_pairs = []
     for pair in pairs:

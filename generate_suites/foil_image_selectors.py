@@ -163,6 +163,7 @@ def cxc_similar_selector(config):
     found = 0
 
     vg2coco = gu.get_vg_image_ids(config)
+    coco2vg = gu.get_vg_image_ids(config, reverse=True)
     coco_dict = gu.coco_as_dict(config)
     attrs_as_dict = gu.vg_as_dict(config, "attributes", keys="coco")
     rels_dict = gu.vg_as_dict(config, "relationships", keys="coco")
@@ -189,8 +190,8 @@ def cxc_similar_selector(config):
             continue
 
         i1id, i2id = idpair
-        #i1id = vg2coco[i1id]
-        #i2id = vg2coco[i2id]
+        i1id = coco2vg[i1id]
+        i2id = coco2vg[i2id]
         pair = gu.FoilPair(i1id, i2id)
         pairs.append(pair)
 
