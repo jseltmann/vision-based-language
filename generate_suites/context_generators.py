@@ -226,3 +226,34 @@ def caption_adj_generator(pairs, config):
         pair.formula = "(2;%foiled%) > (2;%correct%)"
 
     return pairs
+
+
+def vg_obj_list_generator(pairs, config):
+    """
+    Generate context as list of objects in the image.
+    """
+
+    objs = gu.vg_as_dict(config, "objects", keys="visgen")
+    p = inflect.engine()
+
+    new_pairs = []
+    for pair in pairs:
+        orig_objs = objs[pair.orig_img]["objects"]
+        obj_names = [o["names"][0] for o in orig_objs]
+        objs_per_example = 5
+        while len(obj_names) > objs_per_example:
+            new_pair = copy.deepcopy(pair)
+            curr_objs = obj_names[:objs_per_example]
+            obj_names = obj_names[objs_per_example:]
+
+            context_objs = curr_objs[:(objs_per_example-1)]
+            context = "There is "
+            for obj in context_objs:
+                context += p.a(obj) + ","
+            context += "and "
+            new_pair.context = context
+            new_pair.info = {"corr_obj": obj_names[-1]}
+
+            new_pairs.append(new_pair)
+
+    return new_pairs

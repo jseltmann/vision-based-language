@@ -167,3 +167,18 @@ def have_questions(pair, config, info=None):
     if qas[c2id]['qas'] == []:
         return False
     return True
+
+
+def have_objects(pair, config, info=None):
+    """
+    Return True iff both images are annotated with objects.
+    """
+    objs = info["objs"]
+
+    c1id = pair[0]
+    if objs[c1id]["objects"] == []:
+        return False
+    c2id = pair[1]
+    if objs[c2id]["objects"] == []:
+        return False
+    return True

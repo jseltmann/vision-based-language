@@ -188,3 +188,41 @@ def qa_base_combinator(pairs, config):
             full_pairs.append(full_pair)
 
     return full_pairs
+
+
+def vg_obj_list_combinator(pairs, config):
+    """
+    Counterpart to vg_obj_list_generator.
+    """
+
+    objs = gu.vg_as_dict(config, "objects", keys="visgen")
+    p = inflect.engine()
+
+    full_pairs = []
+    for pair in pairs:
+        r1 = pair.context
+        pair.correct["regions"].append({"region_number":1, "content": r1})
+        orig_obj = pair.info["corr_obj"]
+        r2 = p.a(orig_obj) + "."
+        pair.correct["regions"].append({"region_number":2, "content": r2})
+
+        pair.region_meta = {"1": "context", "2": "object"}
+        pair.formula = "(*;%foiled%) > (*;%correct%)"
+
+        foil_objs = objs[pair.foil_img]["objects"]
+        foil_objs = [o["names"][0] for o in foil_objs]
+        if len(foil_objs) < 10:
+            foil_objs = random.choices(foil_objs, k=len(foil_objs)-1)
+        else:
+            foil_objs = random.choices(foil_objs, k=10)
+
+        for foil_obj in foil_objs:
+            full_pair = copy.deepcopy(pair)
+            r1 = pair.context
+            full_pair.foiled["regions"].append({"region_number":1, "content": r1})
+            r2 = p.a(foil_obj) + "."
+            full_pair.foiled["regions"].append({"region_number":2, "content": r2})
+
+            full_pairs.append(full_pair)
+
+    return full_pairs
