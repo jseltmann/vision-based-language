@@ -5,6 +5,7 @@ import inflect
 import copy
 import pickle
 import codecs
+from tqdm import tqdm
 
 import generation_utils as gu
 
@@ -101,11 +102,12 @@ def caption_adj_combinator(pairs, config):
     with an attribute from a different context.
     """
 
-    attrs = gu.attrs_as_dict(config)
+    attrs = gu.vg_as_dict(config, "attributes", keys="visgen")
     p = inflect.engine()
 
     full_pairs = []
-    for pair in pairs:
+    #for pair in pairs:
+    for pair in tqdm(pairs):
         img_attrs = attrs[pair.foil_img]['attributes']
         has_attrs = lambda o: 'attributes' in o.keys() and o['attributes'] != []
         objs = [obj for obj in img_attrs if has_attrs(obj)]

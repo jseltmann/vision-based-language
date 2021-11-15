@@ -32,7 +32,7 @@ def ade_different_category_selector(config):
     with open(os.path.join(ade_path, "index_ade20k.pkl"), "rb") as indf:
         index = pickle.load(indf)
 
-    num_examples = int(config["General"]["num_examples"])
+    num_examples = 2 * int(config["General"]["num_examples"])
 
     train_path = os.path.join(ade_path, "images/ADE/training/")
     categories = set(os.listdir(train_path))
@@ -87,25 +87,27 @@ def ade_different_scene_selector(config):
 
     ade_path = config["Datasets"]["ade_path"]
     with open(os.path.join(ade_path, "index_ade20k.pkl"), "rb") as indf:
-        index = pickle.load(ade_path)
+        index = pickle.load(indf)
 
-    num_examples = config["General"]["num_examples"]
-    selected_fns = random.choices(index['filename'], k=num_examples)
+    num_examples = int(config["General"]["num_examples"])
+    train_fns = [fn for fn in index['filename'] if "train" in fn]
+    selected_fns = random.choices(list(enumerate(train_fns)), k=num_examples)
 
     train_path = os.path.join(ade_path, "images/ADE/training/")
 
     pairs = []
-    for fn in selected_fns:
-        path = index["folder"]
+    for i, fn in selected_fns:
+        path = index["folder"][i]
         category = path.split("/")[-2]
         scene = path.split("/")[-1]
-        cat_path = os.path.join(train_path, cat)
+        cat_path = os.path.join(train_path, category)
         scenes = [d for d in os.listdir(cat_path) if d!=scene]
         foil_scene = random.choice(scenes)
         foil_scene_path = os.path.join(cat_path, scene)
-        foil_fns = [fn for fn in os.listdir(foil_scene_path) if fn.endswith("jpg")]
+        fn_criteria = lambda fn: fn.endswith("jpg") and "train" in fn
+        foil_fns = [fn for fn in os.listdir(foil_scene_path) if fn_criteria(fn)]
         foil_fn = random.choice(foil_fns)
-        pair = FoilPair(fn, foil_fn)
+        pair = gu.FoilPair(fn, foil_fn)
         pairs.append(pair)
     return pairs
 
@@ -162,9 +164,6 @@ def cxc_similar_selector(config):
     pairs = []
     chosen = set()
 
-    num_tries = 0
-    found = 0
-
     vg2coco = gu.get_vg_image_ids(config)
     coco2vg = gu.get_vg_image_ids(config, reverse=True)
     coco_dict = gu.coco_as_dict(config)
@@ -181,8 +180,8 @@ def cxc_similar_selector(config):
             'objs': objs_dict,
             'qas': qas}
 
-    for idpair in tqdm(idpairs):
-    #for idpair in idpairs:
+    #for idpair in tqdm(idpairs):
+    for idpair in idpairs:
         sort_out = False
         for cond_fn in cond_fns:
             if cond_fn(idpair, config, info=info) == False:
@@ -191,13 +190,17 @@ def cxc_similar_selector(config):
 
         if sort_out == True:
             continue
-        found += 1
-        if found == 10:
-            continue
 
         i1id, i2id = idpair
-        i1id = coco2vg[i1id]
-        i2id = coco2vg[i2id]
+        if config["Functions"]["generator"] != "caption_adj_generator":
+            # using VG ids is usually more useful
+            i1id = coco2vg[i1id]
+            i2id = coco2vg[i2id]
+        else:
+            # but for the captions we can use coco images
+            # not contained in VisualGenome
+            # the foil image still needs to be in VG, though
+            i2id = coco2vg[i2id]
         pair = gu.FoilPair(i1id, i2id)
         pairs.append(pair)
 

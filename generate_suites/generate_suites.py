@@ -1,6 +1,9 @@
 import json
 import configparser
 import sys
+import csv
+import copy
+import os
 
 import context_generators as cg
 import foil_image_selectors as fis
@@ -47,7 +50,12 @@ def split(config, pairs):
     Split off some pairs for fine-tuning.
     """
     train_split = float(config["General"]["trainsplit"])
-    cutoff = int(train_split * len(pairs))
+    #cutoff = int(train_split * len(pairs))
+    num_examples = int(config["General"]["num_examples"])
+    if len(pairs) >= 2 * num_examples:
+        cutoff = num_examples
+    else:
+        cutoff = int(train_split * len(pairs))
     train = pairs[:cutoff]
     test = pairs[cutoff:]
 
@@ -89,30 +97,83 @@ if __name__ == "__main__":
     config = configparser.ConfigParser()
     config.read(config_path)
 
-    generator_str = config["Functions"]["generator"] # read name of generator function from config file
-    generator = getattr(cg, generator_str)
-    selector_str = config["Functions"]["selector"]
-    selector = getattr(fis, selector_str)
-    combinator_str = config["Functions"]["combinator"]
-    combinator = getattr(com, combinator_str)
+    with open("generation_combinations.csv", newline='') as gcf:
+        not_comment = lambda line: line[0]!='#'
+        reader = csv.reader(filter(not_comment, gcf), delimiter=",")
 
-    pairs = selector(config)
-    print(len(pairs))
-    print("selected")
-    with_context = generator(pairs, config)
-    print(len(with_context))
-    print("context")
-    combined = combinator(with_context, config)
-    print("combined")
-    print(len(combined))
-    test, train = split(config, combined)
+        for i, row in enumerate(reader):
+            cfg_copy = copy.deepcopy(config)
+            if i == 0:
+                continue
+            print(row[4])
 
-    save_path = config["General"]["suite_path"]
-    suite_name = config["General"]["suite_name"]
+            if row[1] != '':
+                cfg_copy["Functions"]["generator"] = row[1]
+            generator_str = cfg_copy["Functions"]["generator"] # read name of generator function from config file
+            generator = getattr(cg, generator_str)
 
-    generate_suite(test, save_path, suite_name, 
-            (generator_str, selector_str, combinator_str))
+            if row[0] != '':
+                cfg_copy["Functions"]["selector"] = row[0]
+            selector_str = cfg_copy["Functions"]["selector"]
+            selector = getattr(fis, selector_str)
 
-    ### save train data as suite for debugging
-    generate_suite(train, save_path+"_train", suite_name, 
-            (generator_str, selector_str, combinator_str))
+            if row[2] != '':
+                cfg_copy["Functions"]["combinator"] = row[2]
+            combinator_str = cfg_copy["Functions"]["combinator"]
+            combinator = getattr(com, combinator_str)
+
+            suite_dir = cfg_copy["General"]["suites_dir"] + row[3]
+            cfg_copy["General"]["suite_path"] = suite_dir + "/" + row[4] + "_test.json"
+            cfg_copy["General"]["finetune_path"] = suite_dir + "/" + row[4] + "_train.json"
+            cfg_copy["General"]["cfg_path"] = suite_dir + "/" + row[4] + ".cfg"
+
+            if os.path.exists(cfg_copy["General"]["suite_path"]):
+                continue
+
+            cfg_copy["General"]["suite_name"] = row[4]
+
+            if row[5] != '':
+                cfg_copy["Datasets"]["cxc_subset"] = row[5]
+
+            if row[6] != '':
+                cfg_copy["General"]["cutoff"] = row[6]
+            if row[7] != '':
+                cfg_copy["General"]["similar"] = row[7]
+            if row[8] != '':
+                cfg_copy["General"]["trainsplit"] = row[8]
+            if row[9] != '':
+                cfg_copy["General"]["num_examples"] = row[9]
+            if row[10] != '':
+                cfg_copy["General"]["conditions"] = row[10].replace("|", "\n")
+
+            pairs = selector(cfg_copy)
+            #print(len(pairs))
+            print("selected")
+            with_context = generator(pairs, cfg_copy)
+            #print(len(with_context))
+            print("context")
+            combined = combinator(with_context, cfg_copy)
+            #print(len(combined))
+            print("combined")
+            print("number of pairs: " + str(len(combined)))
+
+            if not os.path.exists(suite_dir):
+                os.makedirs(suite_dir)
+
+            test, train = split(cfg_copy, combined)
+            cfg_copy["General"]["train_examples"] = str(len(train))
+            cfg_copy["General"]["test_examples"] = str(len(test))
+
+            save_path = cfg_copy["General"]["suite_path"]
+            suite_name = cfg_copy["General"]["suite_name"]
+
+            generate_suite(test, save_path, suite_name, 
+                    (generator_str, selector_str, combinator_str))
+
+            ### save train data as suite for debugging
+            #generate_suite(train, save_path+"_train", suite_name, 
+            #        (generator_str, selector_str, combinator_str))
+
+            cfg_path = os.path.join(suite_dir, suite_name+".cfg")
+            with open(cfg_path, "w") as configfile:
+                cfg_copy.write(configfile)

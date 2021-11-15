@@ -129,14 +129,10 @@ def with_obj_2(pair, config, info=None):
     """
     objs = info["objs"]
     i2id = pair[1]
-    if not i2id in objs:# or not 'relationships' in objs[i2id]:
-        #print("a", end="")
+    if not i2id in objs:
         return False
-    #if len(objs[i2id]["relationships"]) < 1:
     if len(objs[i2id]["objects"]) < 1:
-        #print("b", end="")
         return False
-    #print("c", end="")
     return True
 
 

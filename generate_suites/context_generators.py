@@ -41,7 +41,8 @@ def ade_thereis_generator(pairs, config):
     with open(os.path.join(ade_path, "index_ade20k.pkl"), "rb") as indf:
         index = pickle.load(indf)
 
-    for pair in tqdm(pairs):
+    #for pair in tqdm(pairs):
+    for pair in pairs:
         json_path = gu.get_ade_json_path(pair.orig_img, data_path, index)
         with codecs.open(json_path, "r", "ISO-8859-1") as jfile:
             annot = json.load(jfile)['annotation']
@@ -191,8 +192,12 @@ def caption_adj_generator(pairs, config):
         for img in caption_data:
             caption_dict[img['image_id']] = img
 
+    #vg2coco = gu.get_vg_image_ids(config)
+
     nlp = spacy.load("en_core_web_sm")
+    #for pair in tqdm(pairs):
     for pair in pairs:
+        #img = caption_dict[vg2coco[pair.orig_img]]
         img = caption_dict[pair.orig_img]
         doc = nlp(img['caption'])
         adj_positions = [i for i, word in enumerate(doc) if word.pos_=='ADJ']
