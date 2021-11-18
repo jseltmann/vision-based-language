@@ -1,6 +1,9 @@
 selector,generator,combinator,suite_dir,suite_name,cxc_subset,cutoff,similar,trainsplit,num_examples,conditions
 ade_different_category_selector,ade_thereis_generator,ade_thereis_combinator,ade_thereis,ade_diff_cat,,,,0.5,5000,
 ade_different_scene_selector,ade_thereis_generator,ade_thereis_combinator,ade_thereis,ade_diff_sce,,,,0.5,5000,
+ade_same_image_selector,ade_thereis_generator,ade_thereis_combinator,ade_thereis,ade_same,,,,0.5,5000,
+#
+#
 cxc_similar_selector,qa_base_generator,qa_base_combinator,cxc_qa,cxc_qa_sis_similar,sis_combined.csv,3.5,True,0.5,5000,pair_in_vg|have_questions
 cxc_similar_selector,qa_base_generator,qa_base_combinator,cxc_qa,cxc_qa_sis_dissim,sis_combined.csv,2.5,False,0.5,5000,pair_in_vg|have_questions
 #
@@ -12,3 +15,13 @@ cxc_similar_selector,relationship_obj_generator,relationship_obj_combinator,cxc_
 #
 cxc_similar_selector,caption_adj_generator,caption_adj_combinator,cxc_cap,cxc_cap_adj_sis_similar,sis_combined.csv,3.5,True,0.5,5000,img_with_attr|caption_with_adj
 cxc_similar_selector,caption_adj_generator,caption_adj_combinator,cxc_cap,cxc_cap_adj_sis_dissim,sis_combined.csv,2.5,False,0.5,5000,img_with_attr|caption_with_adj
+#
+#
+#
+cxc_same_selector,qa_base_generator,qa_base_combinator,cxc_qa,cxc_qa_sis_same,sis_combined.csv,3.5,True,0.5,5000,pair_in_vg|have_questions
+#
+cxc_same_selector,vg_attribute_generator,vg_attribute_combinator,cxc_attr,cxc_attr_sis_same,sis_combined.csv,3.5,True,0.5,5000,pair_in_vg|both_img_with_attr
+#
+cxc_same_selector,relationship_obj_generator,relationship_obj_combinator,cxc_rel,cxc_rel_obj_sis_same,sis_combined.csv,3.5,True,0.5,5000,pair_in_vg|img_with_rel|with_obj_2
+#
+cxc_same_selector,caption_adj_generator,caption_adj_combinator,cxc_cap,cxc_cap_adj_sis_same,sis_combined.csv,3.5,True,0.5,5000,img_with_attr|caption_with_adj

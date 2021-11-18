@@ -112,6 +112,38 @@ def ade_different_scene_selector(config):
     return pairs
 
 
+def ade_same_image_selector(config):
+    """
+    Select one image and use it as both original and foil.
+
+    Parameters
+    ----------
+    config : Configparser
+        Read from config file
+
+    Return
+    ------
+    pairs : [Pairs]
+        FoilPairs with selected images.
+    """
+
+    ade_path = config["Datasets"]["ade_path"]
+    with open(os.path.join(ade_path, "index_ade20k.pkl"), "rb") as indf:
+        index = pickle.load(indf)
+
+    num_examples = int(config["General"]["num_examples"])
+    train_fns = [fn for fn in index['filename'] if "train" in fn]
+    selected_fns = random.choices(list(enumerate(train_fns)), k=num_examples)
+
+    train_path = os.path.join(ade_path, "images/ADE/training/")
+
+    pairs = []
+    for i, fn in selected_fns:
+        pair = gu.FoilPair(fn, fn)
+        pairs.append(pair)
+    return pairs
+
+
 def cxc_similar_selector(config):
     """
     Select a pair of images to be similar to 
@@ -160,6 +192,105 @@ def cxc_similar_selector(config):
         idpairs = [idpair for idpair in similarities if similarities[idpair] > cutoff]
     else:
         idpairs = [idpair for idpair in similarities if similarities[idpair] < cutoff]
+
+    pairs = []
+    chosen = set()
+
+    vg2coco = gu.get_vg_image_ids(config)
+    coco2vg = gu.get_vg_image_ids(config, reverse=True)
+    coco_dict = gu.coco_as_dict(config)
+    attrs_as_dict = gu.vg_as_dict(config, "attributes", keys="coco")
+    rels_dict = gu.vg_as_dict(config, "relationships", keys="coco")
+    objs_dict = gu.vg_as_dict(config, "objects", keys="coco")
+    qas = gu.vg_as_dict(config, "question_answers", keys="coco")
+
+    info = {'attrs': attrs_as_dict,
+            'vg2coco': vg2coco,
+            'coco2vg': coco2vg,
+            'coco_captions': coco_dict,
+            'rels': rels_dict,
+            'objs': objs_dict,
+            'qas': qas}
+
+    #for idpair in tqdm(idpairs):
+    for idpair in idpairs:
+        sort_out = False
+        for cond_fn in cond_fns:
+            if cond_fn(idpair, config, info=info) == False:
+                sort_out = True
+                break
+
+        if sort_out == True:
+            continue
+
+        i1id, i2id = idpair
+        if config["Functions"]["generator"] != "caption_adj_generator":
+            # using VG ids is usually more useful
+            i1id = coco2vg[i1id]
+            i2id = coco2vg[i2id]
+        else:
+            # but for the captions we can use coco images
+            # not contained in VisualGenome
+            # the foil image still needs to be in VG, though
+            i2id = coco2vg[i2id]
+        pair = gu.FoilPair(i1id, i2id)
+        pairs.append(pair)
+
+    return pairs
+
+
+
+def cxc_same_selector(config):
+    """
+    Select an image as both original and foil image.
+    Only use images annotated in CxC, 
+    to keep the pair comparable to the ones produced
+    by cxc_similar_selector.
+
+    Parameters
+    ----------
+    config : Configparser
+        Read from config file
+
+    Values read from config file
+    ----------------------------
+    cxc_path : str
+        Path to CxC dataset.
+    num_examples : int
+        Number of example pairs to choose.
+    cutoff : float
+        Similarity value below or above which to select.
+    similar : bool
+        Wether to select similar or dissimilar image pairs.
+    cxc_subset : str
+        Filename of specific part of CxC to use.
+    conditions : [function]
+        Functions returning bools that apply further conditions
+        to the pairs to be selected.
+
+    Return
+    ------
+    pairs : [Pairs]
+        FoilPairs with selected images.
+    """
+
+    cxc_path = config["Datasets"]["cxc_path"]
+    cutoff = float(config["General"]["cutoff"])
+    similar = bool(config["General"]["similar"])
+    cxc_subset = config["Datasets"]["cxc_subset"]
+    conditions = config["General"]["conditions"].split("\n")
+    if conditions[0] != '':
+        cond_fns = [getattr(sc, cond) for cond in conditions]
+    else:
+        cond_fns = []
+
+    similarities = gu.read_cxc(cxc_path, cxc_subset)
+
+    idpairs = []
+    for idpair in similarities:
+        i1id, i2id = idpair
+        idpairs.append((i1id,i1id))
+        idpairs.append((i1id,i1id))
 
     pairs = []
     chosen = set()

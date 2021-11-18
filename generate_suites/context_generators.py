@@ -151,17 +151,17 @@ def relationship_obj_generator(pairs, config):
         orig_rels = rels[pair.orig_img]
         for rel in orig_rels["relationships"]:
             if 'name' in rel['subject']:
-                subj = rel['subject']['name']
+                subj = rel['subject']['name'].strip('"')
             else:
-                subj = rel['subject']['names'][0]
-            pred = rel['predicate']
+                subj = rel['subject']['names'][0].strip('"')
+            pred = rel['predicate'].lower().strip('"')
             context = (subj + " " + pred,)
             new_pair = copy.deepcopy(pair)
             new_pair.context = context
             if 'name' in rel['object']:
-                new_pair.info = {"orig_obj": rel['object']['name']}
+                new_pair.info = {"orig_obj": rel['object']['name'].strip('"')}
             else:
-                new_pair.info = {"orig_obj": rel['object']['names'][0]}
+                new_pair.info = {"orig_obj": rel['object']['names'][0].strip('"')}
             new_pairs.append(new_pair)
     return new_pairs
 
@@ -220,11 +220,11 @@ def caption_adj_generator(pairs, config):
         pair.context = context
         pair.info = info
 
-        r1 = earlier.text
+        r1 = earlier.text.strip()
         pair.correct["regions"].append({"region_number":1, "content": r1})
-        r2 = doc[adj_pos].text
+        r2 = doc[adj_pos].text.strip()
         pair.correct["regions"].append({"region_number":2, "content": r2})
-        r3 = later.text
+        r3 = later.text.strip()
         pair.correct["regions"].append({"region_number":3, "content": r3})
 
         pair.region_meta = {"1": "earlier", "2": "adj", "3": "later"}

@@ -74,8 +74,10 @@ def vg_attribute_combinator(pairs, config):
     for pair in pairs:
         orig_obj = pair.info["orig_object"]
         attr = random.choice(orig_obj["attributes"])
+        attr = attr.strip()
         r = pair.context[0] + p.a(attr)
         r += " " + pair.context[1] + "."
+        #r += pair.context[1] + "."
         pair.correct['regions'].append({"region_number":1, "content": r})
 
         img_attrs = attrs[pair.foil_img]['attributes']
@@ -84,6 +86,7 @@ def vg_attribute_combinator(pairs, config):
         for obj in objs:
             #obj = random.choice(objs)
             attr = random.choice(obj['attributes'])
+            attr = attr.strip()
             r = pair.context[0] + p.a(attr)
             r += " " + pair.context[1] + "."
             new_pair = copy.deepcopy(pair)
@@ -128,7 +131,7 @@ def caption_adj_combinator(pairs, config):
             else:
                 r1 = earlier.strip()
                 new_pair.foiled["regions"].append({"region_number":1, "content": r1})
-                r2 = earlier.strip()
+                r2 = attr.strip()
                 new_pair.foiled["regions"].append({"region_number":2, "content": r2})
             r3 = later.strip()
             new_pair.foiled["regions"].append({"region_number":3, "content": r3})
@@ -151,15 +154,24 @@ def relationship_obj_combinator(pairs, config):
             new_pair = copy.deepcopy(pair)
 
             r1 = pair.context[0]
+            if '"' in r1:
+                print(r1)
+                6 / 0
             new_pair.correct["regions"].append({"region_number": 1, "content": r1})
             r2 = pair.info["orig_obj"]
+            if '"' in r2:
+                print(r2)
+                5 / 0
             new_pair.correct["regions"].append({"region_number": 2, "content": r2})
 
             new_pair.foiled["regions"].append({"region_number": 1, "content": r1})
             if "name" in obj:
-                r2 = obj["name"]
+                r2 = obj["name"].strip('"')
             else:
-                r2 = obj["names"][0]
+                r2 = obj["names"][0].strip('"')
+            if '"' in r2:
+                print(r2)
+                5 / 0
             new_pair.foiled["regions"].append({"region_number": 2, "content": r2})
 
             new_pair.region_meta = {"1": "context", "2": "object"}
