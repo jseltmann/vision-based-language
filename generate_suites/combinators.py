@@ -6,6 +6,8 @@ import copy
 import pickle
 import codecs
 from tqdm import tqdm
+from gensim.models import Word2Vec
+from gensim.similarities.annoy import AnnoyIndexer
 
 import generation_utils as gu
 
@@ -74,21 +76,25 @@ def vg_attribute_combinator(pairs, config):
     for pair in pairs:
         orig_obj = pair.info["orig_object"]
         attr = random.choice(orig_obj["attributes"])
-        attr = attr.strip()
+        #attr = attr.strip()
+        attr = " ".join(attr.split()) # remove multiple spaces in attribute
         r = pair.context[0] + p.a(attr)
         r += " " + pair.context[1] + "."
+        r = r.strip()
         #r += pair.context[1] + "."
         pair.correct['regions'].append({"region_number":1, "content": r})
 
         img_attrs = attrs[pair.foil_img]['attributes']
         has_attrs = lambda o: 'attributes' in o.keys() and o['attributes'] != []
-        objs = [obj for obj in img_attrs if has_attrs(obj)]
+        objs = [obj for obj in img_attrs if has_attrs(obj)][:10]
         for obj in objs:
             #obj = random.choice(objs)
             attr = random.choice(obj['attributes'])
-            attr = attr.strip()
+            attr = " ".join(attr.split()) # remove multiple spaces in attribute
+            #attr = attr.strip()
             r = pair.context[0] + p.a(attr)
             r += " " + pair.context[1] + "."
+            r = r.strip()
             new_pair = copy.deepcopy(pair)
             new_pair.foiled['regions'].append({"region_number":1, "content": r})
 
@@ -113,18 +119,100 @@ def caption_adj_combinator(pairs, config):
     for pair in tqdm(pairs):
         img_attrs = attrs[pair.foil_img]['attributes']
         has_attrs = lambda o: 'attributes' in o.keys() and o['attributes'] != []
-        objs = [obj for obj in img_attrs if has_attrs(obj)]
+        objs = [obj for obj in img_attrs if has_attrs(obj)][:5]
         for obj in objs:
             new_pair = copy.deepcopy(pair)
             attr = random.choice(obj['attributes'])
+            if attr.strip() == "":
+                continue
 
             earlier, later = new_pair.context
+            #if "young child" in earlier or "tennis ball" in later:
+            #    print(earlier, later, attr)
             if 'start' in new_pair.info and new_pair.info['start'] == True:
                 new_pair.foiled["regions"].append({"region_number":1, "content": ""})
                 r2 = attr.capitalize().strip()
                 new_pair.foiled["regions"].append({"region_number":2, "content": r2})
             elif new_pair.info['indefinite']:
-                r1 = earlier + " " + p.a(attr).strip()
+                if len(earlier) > 0:
+                    r1 = earlier + " " + p.a(attr).strip()
+                else:
+                    r1 = p.a(attr).strip()
+                #r1 = earlier + " " + p.a(attr).strip()
+                r1 = r1.strip()
+                new_pair.foiled["regions"].append({"region_number":1, "content": r1})
+                r2 = attr.strip()
+                new_pair.foiled["regions"].append({"region_number":2, "content": r2})
+            else:
+                r1 = earlier.strip()
+                new_pair.foiled["regions"].append({"region_number":1, "content": r1})
+                r2 = attr.strip()
+                new_pair.foiled["regions"].append({"region_number":2, "content": r2})
+            r3 = later.strip()
+            new_pair.foiled["regions"].append({"region_number":3, "content": r3})
+            full_pairs.append(new_pair)
+
+    return full_pairs
+
+
+def caption_adj_opposite_combinator(pairs, config):
+    """
+    Generate foil text by replacing an adjective
+    with an attribute from a different context.
+    """
+
+    attrs = gu.vg_as_dict(config, "attributes", keys="visgen")
+    p = inflect.engine()
+
+    index_path = os.path.join(config["Datasets"]["vg_path"], "w2v_attributes.index")
+    model_path = os.path.join(config["Datasets"]["vg_path"], "w2v_attributes.model")
+    if os.path.exists(index_path):
+        index = AnnoyIndexer()
+        index.load(index_path)
+        model = Word2Vec.load(model_path)
+    else:
+        corpus = []
+        for img_id in attrs:
+            img = attrs[img_id]
+            img_attrs = []
+            for obj in img['attributes']:
+                if not 'attributes' in obj:
+                    continue
+                for a in obj['attributes']:
+                    img_attrs += a.split()
+            corpus.append(img_attrs)
+
+        model = Word2Vec(sentences=corpus, vector_size=100, window=20, min_count=1, sg=0)
+        model.save(model_path)
+        index = AnnoyIndexer(model, 100)
+        index.save(index_path)
+
+    full_pairs = []
+    empty = 0
+    for pair in tqdm(pairs):
+        orig_attr = pair.info["orig_adj"]
+        negative = orig_attr.split()
+        negative = [w for w in negative if w in model.wv]
+        if negative == []:
+            empty += 1
+            continue
+
+        foil_attrs = model.wv.most_similar(negative=negative, topn=5, indexer=index)
+        for attr, sim in foil_attrs:
+            new_pair = copy.deepcopy(pair)
+            earlier, later = new_pair.context
+            #if "young child" in earlier or "tennis ball" in later:
+            #    print(earlier, later, attr)
+            if 'start' in new_pair.info and new_pair.info['start'] == True:
+                new_pair.foiled["regions"].append({"region_number":1, "content": ""})
+                r2 = attr.capitalize().strip()
+                new_pair.foiled["regions"].append({"region_number":2, "content": r2})
+            elif new_pair.info['indefinite']:
+                if len(earlier) > 0:
+                    r1 = earlier + " " + p.a(attr).strip()
+                else:
+                    r1 = p.a(attr).strip()
+                r1 = r1.strip()
                 new_pair.foiled["regions"].append({"region_number":1, "content": r1})
                 r2 = attr.strip()
                 new_pair.foiled["regions"].append({"region_number":2, "content": r2})
@@ -150,18 +238,13 @@ def relationship_obj_combinator(pairs, config):
     full_pairs = []
     for pair in pairs:
         foil_objs = objs[pair.foil_img]['objects']
+        foil_objs = random.choices(foil_objs, k=10)
         for obj in foil_objs:
             new_pair = copy.deepcopy(pair)
 
             r1 = pair.context[0]
-            if '"' in r1:
-                print(r1)
-                6 / 0
             new_pair.correct["regions"].append({"region_number": 1, "content": r1})
             r2 = pair.info["orig_obj"]
-            if '"' in r2:
-                print(r2)
-                5 / 0
             new_pair.correct["regions"].append({"region_number": 2, "content": r2})
 
             new_pair.foiled["regions"].append({"region_number": 1, "content": r1})
@@ -169,9 +252,75 @@ def relationship_obj_combinator(pairs, config):
                 r2 = obj["name"].strip('"')
             else:
                 r2 = obj["names"][0].strip('"')
-            if '"' in r2:
-                print(r2)
-                5 / 0
+            new_pair.foiled["regions"].append({"region_number": 2, "content": r2})
+
+            new_pair.region_meta = {"1": "context", "2": "object"}
+            new_pair.formula = "(*;%foiled%) > (*;%correct%)"
+            full_pairs.append(new_pair)
+
+    return full_pairs
+
+
+def relationship_obj_opposite_combinator(pairs, config):
+    """
+    Counterpart to relationship_obj_generator.
+    """
+
+    objs = gu.vg_as_dict(config, "objects", keys="visgen")
+
+    index_path = os.path.join(config["Datasets"]["vg_path"], "w2v_objects.index")
+    model_path = os.path.join(config["Datasets"]["vg_path"], "w2v_objects.model")
+    if os.path.exists(index_path):
+        index = AnnoyIndexer()
+        index.load(index_path)
+        model = Word2Vec.load(model_path)
+    else:
+        corpus = []
+        for img_id in objs:
+            img = objs[img_id]
+            img_objs = []
+            for obj in img['objects']:
+                if not 'name' in obj:
+                    continue
+                for name in obj['names']:
+                    img_objs += name.lower().split()
+            corpus.append(img_objs)
+
+        model = Word2Vec(sentences=corpus, vector_size=100, window=20, min_count=1, sg=0)
+        model.save(model_path)
+        index = AnnoyIndexer(model, 100)
+        index.save(index_path)
+
+    full_pairs = []
+    for pair in pairs:
+        orig_obj = pair.info["orig_obj"]
+
+        all_objs = objs[pair.orig_img]["objects"]
+        for obj in all_objs:
+             names = obj["names"]
+             for name in names:
+                 name = name.lower().split()
+                 negative += name
+        #negative = orig_obj.split()
+        negative = [w for w in negative if w in model.wv]
+        if negative == []:
+            empty += 1
+            continue
+
+        foil_objs = model.wv.most_similar(negative=negative, topn=5, indexer=index)
+        for obj, sim in foil_objs:
+            new_pair = copy.deepcopy(pair)
+
+            r1 = pair.context[0]
+            new_pair.correct["regions"].append({"region_number": 1, "content": r1})
+            r2 = pair.info["orig_obj"]
+            new_pair.correct["regions"].append({"region_number": 2, "content": r2})
+
+            new_pair.foiled["regions"].append({"region_number": 1, "content": r1})
+            if "name" in obj:
+                r2 = obj["name"].strip('"')
+            else:
+                r2 = obj["names"][0].strip('"')
             new_pair.foiled["regions"].append({"region_number": 2, "content": r2})
 
             new_pair.region_meta = {"1": "context", "2": "object"}
@@ -240,3 +389,144 @@ def vg_obj_list_combinator(pairs, config):
             full_pairs.append(full_pair)
 
     return full_pairs
+
+
+def vg_obj_list_opposite_combinator(pairs, config):
+    """
+    Counterpart to vg_obj_list_generator,
+    but choose foil word based on word similarities
+    in the visual genome objects.
+    """
+
+    objs = gu.vg_as_dict(config, "objects", keys="visgen")
+    p = inflect.engine()
+
+    index_path = os.path.join(config["Datasets"]["vg_path"], "w2v_objects.index")
+    model_path = os.path.join(config["Datasets"]["vg_path"], "w2v_objects.model")
+    if os.path.exists(index_path):
+        index = AnnoyIndexer()
+        index.load(index_path)
+        model = Word2Vec.load(model_path)
+    else:
+        corpus = []
+        for img_id in objs:
+            img = objs[img_id]
+            img_objs = []
+            for obj in img['objects']:
+                if not 'name' in obj:
+                    continue
+                for name in obj['names']:
+                    img_objs += name.split()
+            corpus.append(img_objs)
+
+        model = Word2Vec(sentences=corpus, vector_size=100, window=20, min_count=1, sg=0)
+        model.save(model_path)
+        index = AnnoyIndexer(model, 100)
+        index.save(index_path)
+
+    empty = 0
+    full_pairs = []
+    for pair in pairs:
+        r1 = pair.context
+        pair.correct["regions"].append({"region_number":1, "content": r1})
+        orig_obj = pair.info["corr_obj"]
+        r2 = p.a(orig_obj) + "."
+        pair.correct["regions"].append({"region_number":2, "content": r2})
+
+        pair.region_meta = {"1": "context", "2": "object"}
+        pair.formula = "(*;%foiled%) > (*;%correct%)"
+
+        #negative = orig_obj.split()
+        all_objs = objs[pair.orig_img]["objects"]
+        for obj in all_objs:
+             names = obj["names"]
+             for name in names:
+                 name = name.lower().split()
+                 negative += name
+
+        negative = [w for w in negative if w in model.wv]
+        if negative == []:
+            empty += 1
+            continue
+
+        foil_objs = model.wv.most_similar(negative=negative, topn=5, indexer=index)
+
+        for foil_obj, sim in foil_objs:
+            full_pair = copy.deepcopy(pair)
+            r1 = pair.context
+            full_pair.foiled["regions"].append({"region_number":1, "content": r1})
+            r2 = p.a(foil_obj) + "."
+            full_pair.foiled["regions"].append({"region_number":2, "content": r2})
+
+            full_pairs.append(full_pair)
+
+    return full_pairs
+
+
+def vg_attribute_opposite_combinator(pairs, config):
+    """
+    Like vg_attribute_combinator,
+    but choose foil word based on word similarities
+    in the visual genome attributes.
+    """
+
+    attrs = gu.vg_as_dict(config, "attributes", keys="visgen")
+    for imgid, img in attrs.items():
+        if not isinstance(img, dict):
+            print(type(img))
+    p = inflect.engine()
+    new_pairs = []
+
+    index_path = os.path.join(config["Datasets"]["vg_path"], "w2v_attributes.index")
+    model_path = os.path.join(config["Datasets"]["vg_path"], "w2v_attributes.model")
+    if os.path.exists(index_path):
+        index = AnnoyIndexer()
+        index.load(index_path)
+        model = Word2Vec.load(model_path)
+    else:
+        corpus = []
+        for img_id in attrs:
+            img = attrs[img_id]
+            img_attrs = []
+            for obj in img['attributes']:
+                if not 'attributes' in obj:
+                    continue
+                for a in obj['attributes']:
+                    img_attrs += a.split()
+            corpus.append(img_attrs)
+
+        model = Word2Vec(sentences=corpus, vector_size=100, window=20, min_count=1, sg=0)
+        model.save(model_path)
+        index = AnnoyIndexer(model, 100)
+        index.save(index_path)
+
+    empty = 0
+    for pair in pairs:
+        orig_obj = pair.info["orig_object"]
+        attr = random.choice(orig_obj["attributes"]).lower()
+        r = pair.context[0] + p.a(attr)
+        r += " " + pair.context[1] + "."
+        pair.correct['regions'].append({"region_number":1, "content": r})
+
+        negative = []
+        for attr in orig_obj["attributes"]:
+            negative += attr.lower().split()
+        #negative = attr.split()
+        negative = [w for w in negative if w in model.wv]
+        if negative == []:
+            empty += 1
+            continue
+
+        foil_attrs = model.wv.most_similar(negative=negative, topn=5, indexer=index)
+        for (attr, sim) in foil_attrs:
+            attr = attr.strip().lower()
+            r = pair.context[0] + p.a(attr)
+            r += " " + pair.context[1] + "."
+            new_pair = copy.deepcopy(pair)
+            new_pair.foiled['regions'].append({"region_number":1, "content": r})
+
+            new_pair.region_meta = {"1": "sentence"}
+            new_pair.formula = "(1;%foiled%) > (1;%correct%)"
+            new_pairs.append(new_pair)
+
+    return new_pairs

@@ -4,6 +4,9 @@ import sys
 import csv
 import copy
 import os
+import random
+import logging
+import traceback
 
 import context_generators as cg
 import foil_image_selectors as fis
@@ -64,8 +67,9 @@ def split(config, pairs):
     train = train[:train_examples]
 
     finetune_path = config["General"]["finetune_path"]
-    corr_sents = []
-    incorr_sents = []
+    #corr_sents = []
+    #incorr_sents = []
+    train_examples = []
     for pair in train:
         corr_text = ""
         for region in pair.correct["regions"]:
@@ -73,7 +77,6 @@ def split(config, pairs):
             if corr_text != "":
                 corr_text += " "
         corr_text = corr_text.strip()
-        corr_sents.append(corr_text)
 
         incorr_text = ""
         for region in pair.foiled["regions"]:
@@ -81,35 +84,69 @@ def split(config, pairs):
             if incorr_text != "":
                 incorr_text += " "
         incorr_text = incorr_text.strip()
-        incorr_sents.append(incorr_text)
 
-    data_dict = {True: corr_sents, False: incorr_sents}
+        if random.random() > 0.5:
+            example = ((corr_text, incorr_text), 0)
+        else:
+            example = ((incorr_text, corr_text), 1)
+        train_examples.append(example)
+
     with open(finetune_path, "w") as ff:
-        json.dump(data_dict, ff)
+        json.dump(train_examples, ff)
+
+    test_path = config["General"]["suite_path"]
+    test_examples = []
+    for pair in test:
+        corr_text = ""
+        for region in pair.correct["regions"]:
+            corr_text += region["content"]
+            if corr_text != "":
+                corr_text += " "
+        corr_text = corr_text.strip()
+
+        incorr_text = ""
+        for region in pair.foiled["regions"]:
+            incorr_text += region["content"]
+            if incorr_text != "":
+                incorr_text += " "
+        incorr_text = incorr_text.strip()
+
+        if random.random() > 0.5:
+            example = ((corr_text, incorr_text), 0)
+        else:
+            example = ((incorr_text, corr_text), 1)
+        test_examples.append(example)
+
+    with open(test_path, "w") as ff:
+        json.dump(test_examples, ff)
 
     return test, train
 
 
 if __name__ == "__main__":
 
+    logging.basicConfig(filename='pairwise.log', level=logging.DEBUG)
+
     if len(sys.argv) != 2:
         print("Using default config file.")
-        config_path = "generation.config"
+        config_path = "pairwise.config"
     else:
         config_path = sys.argv[1]
 
     config = configparser.ConfigParser()
     config.read(config_path)
 
-    with open("generation_combinations.csv", newline='') as gcf:
+    with open("generation_combinations_pairwise.csv", newline='') as gcf:
         not_comment = lambda line: line[0]!='#'
         reader = csv.reader(filter(not_comment, gcf), delimiter=",")
 
         for i, row in enumerate(reader):
+            #try:
             cfg_copy = copy.deepcopy(config)
             if i == 0:
                 continue
             print(row[4])
+            logging.info(row[4])
 
             if row[1] != '':
                 cfg_copy["Functions"]["generator"] = row[1]
@@ -168,11 +205,11 @@ if __name__ == "__main__":
             cfg_copy["General"]["train_examples"] = str(len(train))
             cfg_copy["General"]["test_examples"] = str(len(test))
 
-            save_path = cfg_copy["General"]["suite_path"]
+            #save_path = cfg_copy["General"]["suite_path"]
             suite_name = cfg_copy["General"]["suite_name"]
 
-            generate_suite(test, save_path, suite_name, 
-                    (generator_str, selector_str, combinator_str))
+            #generate_suite(test, save_path, suite_name, 
+            #        (generator_str, selector_str, combinator_str))
 
             ### save train data as suite for debugging
             #generate_suite(train, save_path+"_train", suite_name, 
@@ -181,3 +218,10 @@ if __name__ == "__main__":
             cfg_path = os.path.join(suite_dir, suite_name+".cfg")
             with open(cfg_path, "w") as configfile:
                 cfg_copy.write(configfile)
+            #except Exception as e:
+            #    raise(e)
+                #with open("errors.log", "a") as ef:
+                #    ef.write(row[4] + "\n")
+                #    ef.write(str(e))
+                #    ef.write(str(e.__traceback__))
+                #    ef.write("\n\n")

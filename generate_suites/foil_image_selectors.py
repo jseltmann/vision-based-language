@@ -12,6 +12,21 @@ import selection_conditions as sc
 random.seed(0)
 
 
+def ade_tfidf_same_object_category_selector(config):
+    """
+    Select two categories where the object has a high tfidf
+    in one category and a low one in the other.
+    """
+    ade_path = config["Datasets"]["ade_path"]
+    tfidf_path = os.path.join(ade_path, "tfidfs_cat.json")
+    if os.path.exists(tfidf_path):
+        with open(tfidf_path) as tfidf_file:
+            tfidfs = json.load(tfidf_file)
+    else:
+        
+    
+
+
 def ade_different_category_selector(config):
     """
     Select a pair of images from ADE which are
@@ -89,7 +104,7 @@ def ade_different_scene_selector(config):
     with open(os.path.join(ade_path, "index_ade20k.pkl"), "rb") as indf:
         index = pickle.load(indf)
 
-    num_examples = int(config["General"]["num_examples"])
+    num_examples = 2 * int(config["General"]["num_examples"])
     train_fns = [fn for fn in index['filename'] if "train" in fn]
     selected_fns = random.choices(list(enumerate(train_fns)), k=num_examples)
 
@@ -131,7 +146,7 @@ def ade_same_image_selector(config):
     with open(os.path.join(ade_path, "index_ade20k.pkl"), "rb") as indf:
         index = pickle.load(indf)
 
-    num_examples = int(config["General"]["num_examples"])
+    num_examples = 2 * int(config["General"]["num_examples"])
     train_fns = [fn for fn in index['filename'] if "train" in fn]
     selected_fns = random.choices(list(enumerate(train_fns)), k=num_examples)
 
@@ -236,6 +251,9 @@ def cxc_similar_selector(config):
         pair = gu.FoilPair(i1id, i2id)
         pairs.append(pair)
 
+    with open("cap_adj_selected.pkl", "wb") as savef:
+        pickle.dump(pairs, savef)
+
     return pairs
 
 
@@ -290,7 +308,7 @@ def cxc_same_selector(config):
     for idpair in similarities:
         i1id, i2id = idpair
         idpairs.append((i1id,i1id))
-        idpairs.append((i1id,i1id))
+        idpairs.append((i2id,i2id))
 
     pairs = []
     chosen = set()

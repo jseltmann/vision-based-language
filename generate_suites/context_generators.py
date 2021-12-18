@@ -199,7 +199,8 @@ def caption_adj_generator(pairs, config):
     for pair in pairs:
         #img = caption_dict[vg2coco[pair.orig_img]]
         img = caption_dict[pair.orig_img]
-        doc = nlp(img['caption'])
+        cap = ' '.join(img['caption'].split())
+        doc = nlp(cap)
         adj_positions = [i for i, word in enumerate(doc) if word.pos_=='ADJ']
         adj_ = [word for word in doc if word.pos_=='ADJ']
 
@@ -215,10 +216,11 @@ def caption_adj_generator(pairs, config):
         else:
             info = {'indefinite': False}
         later = doc[adj_pos+1:]
-
+        
         context = (earlier.text, later.text)
         pair.context = context
         pair.info = info
+        pair.info["orig_adj"] = doc[adj_pos].text.strip()
 
         r1 = earlier.text.strip()
         pair.correct["regions"].append({"region_number":1, "content": r1})
