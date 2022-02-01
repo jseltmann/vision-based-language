@@ -2,6 +2,10 @@ import os
 import random
 import json
 import csv
+import inflect
+import spacy
+from collections import defaultdict
+from tqdm import tqdm
 
 random.seed(0)
 
@@ -103,11 +107,12 @@ def ade_fn2index(fn):
     return number
 
 
-def get_ade_json_path(fn, data_path, index):
-    orig_id = ade_fn2index(fn)
-    orig_dir = os.path.join(data_path, index["folder"][orig_id])
-    json_name = fn.split(".")[0] + ".json"
-    json_path = os.path.join(orig_dir, json_name)
+def get_ade_json_path(pos, data_path, index):
+    #orig_id = ade_fn2index(fn)
+    orig_dir = os.path.join(data_path, index["folder"][pos])
+    fn = index['filename'][pos].split(".")[0] + ".json"
+    #json_name = fn.split(".")[0] + ".json"
+    json_path = os.path.join(orig_dir, fn)
     return json_path
 
 
@@ -118,6 +123,7 @@ def _coco_fn2img_id(coco_fn):
         without_ending = without_ending[1:]
     image_id = int(without_ending)
     return image_id
+
 
 def read_cxc(cxc_path, filename):
     """
@@ -136,7 +142,7 @@ def read_cxc(cxc_path, filename):
         Dictionary of of pairs of image ids and similarities
         between the images in the pair.
     """
-    
+
     similarities = dict()
     with open(os.path.join(cxc_path, filename), newline='') as cxcfile:
         cxcreader = csv.reader(cxcfile, delimiter=',')
@@ -150,6 +156,45 @@ def read_cxc(cxc_path, filename):
             similarities[(img_id1,img_id2)] = similarity
 
     return similarities
+
+
+def read_cxc_sentence_similarities(cxc_path):
+    """
+    Read CxC similarities for captions into a dict.
+    """
+    cxc_dict = dict()
+    with open(os.path.join(cxc_path, "sts_val.csv"), newline='') as cxcfile:
+        cxcreader = csv.reader(cxcfile)
+        for i, row in enumerate(cxcreader):
+            if i == 0:
+                continue
+            c1id = int(row[0].split(":")[-1])
+            c2id = int(row[1].split(":")[-1])
+            sim = float(row[2])
+            cxc_dict[(c1id,c2id)] = sim
+            cxc_dict[(c2id,c1id)] = sim
+    return cxc_dict
+
+
+def get_cxc_cap_similarities(cxc_dict, caption_objs, ind_caption=None):
+    """
+    Retrieve CxC similarities for given coco captions.
+    If ind_caption is not None, retrieve similarities between it and 
+    each caption_obj. Otherwise, retrieve pairwise similarities between
+    caption_objs.
+    """
+ 
+    sims = []
+    if ind_caption:
+        cap_tuples = [(ind_caption,b) for b in caption_objs]
+    else:
+        cap_tuples = [(a,b) for a in caption_objs for b in caption_objs]
+
+    for (capa, capb) in cap_tuples:
+        idpair = (capa['id'], capb['id'])
+        if idpair in cxc_dict:
+            sims.append((capa, capb, cxc_dict[idpair]))
+    return sims
 
 
 def vg_as_dict(config, filename, keys="coco"):
@@ -197,3 +242,146 @@ def coco_as_dict(config):
     for img in caption_data:
         coco_dict[img['image_id']] = img['caption']
     return coco_dict
+
+
+def coco_as_dict_list(config):
+    """
+    Get MSCOCO captions as dict
+    with image_ids as keys.
+    """
+    coco_path = config["Datasets"]["mscoco_path"]
+    with open(os.path.join(coco_path, "captions_val2014.json")) as cf:
+        caption_data = json.loads(cf.read())['annotations']
+    coco_dict = defaultdict(list)
+    for img in caption_data:
+        coco_dict[img['image_id']].append(img)
+    return coco_dict
+
+
+
+ade_cat2text_dict = {
+    "transportation": "This is a transportation scene.",
+    "cultural": "This is a cultural place.",
+    "nature_landscape": "This is a place in nature.",
+    "sports_and_leisure": "This is a place for sports and leisure.",
+    "home_or_hotel": "This is a home or hotel.",
+    "work_place": "This is a workplace.",
+    "urban": "This is an urban place.",
+    "industrial": "This is an industrial place.",
+    "shopping_and_dining": "This is a place for shopping and dining.",
+    "unclassified": None,
+    "arena__hockey": "This is a hockey arena.",
+    "stadium__baseball": "This is a baseball stadium.",
+    "underwater__coral_reef": "This is a coral reef.",
+    "arena__soccer": "This is a soccer arena."
+}
+
+
+def ade_cat2text(cat):
+    if cat in ade_cat2text_dict:
+        return ade_cat2text_dict[cat]
+    words = cat.split("__") # remove extra information in scene names
+    words = words[0]
+    words = words.split("_")
+    cat_name = " ".join(words)
+
+    p = inflect.engine()
+    sentence = "This is " + p.a(cat_name) + "."
+
+    return sentence
+
+
+def tokenize_caps(pairs, coco_dict):
+    nlp = spacy.load("en_core_web_sm")
+    stopwords = nlp.Defaults.stop_words
+    for pair in pairs:
+        cs_orig = coco_dict[pair.orig_img]
+        for c in cs_orig:
+            cap_text = [t.text for t in nlp.tokenizer(c["caption"])]
+            w1 = set(cap_text)
+            w1 = {word for word in w1 if word not in stopwords}
+            c["tokenized"] = w1
+        pair.info["captions_orig"] = cs_orig
+        cs_foil = coco_dict[pair.foil_img]
+        for c in cs_foil:
+            #c["tokenized"] = [t.text for t in nlp.tokenizer(c["caption"])]
+            cap_text = [t.text for t in nlp.tokenizer(c["caption"])]
+            w1 = set(cap_text)
+            w1 = {word for word in w1 if word not in stopwords}
+            c["tokenized"] = w1
+        pair.info["captions_foil"] = cs_foil
+
+    return pairs
+
+
+def get_jaccard_similarities(captions, ind_caption=None):
+    """
+    Get jaccard similarities between different captions.
+    If ind_caption is not None, similarities will be calculated between
+    it and each of the given captions.
+    Otherwise, calculate the pairwise similarities of the captions.
+    """
+    if ind_caption:
+        caps1 = [ind_caption]
+    else:
+        caps1 = captions
+    cap_pairs = [(a,b) for a in caps1 for b in captions]
+    #nlp = spacy.load("en_core_web_sm")
+    #stopwords = nlp.Defaults.stop_words
+
+    jaccs = []
+    for (cap1, cap2) in cap_pairs:
+        #cap1_text = cap1["tokenized"]
+        #w1 = set([t.text for t in nlp.tokenizer(cap1_text)])
+        #w1 = set(cap1_text)
+        #w1 = {word for word in w1 if word not in stopwords}
+        w1 = cap1["tokenized"]
+        #cap2_text = cap2["tokenized"]
+        #w2 = set([t.text for t in nlp.tokenizer(cap2_text)])
+        #w2 = set(cap2_text)
+        #w2 = {word for word in w2 if word not in stopwords}
+        w2 = cap2["tokenized"]
+        inter = [w for w in w1 if w in w2]
+        union = w1.union(w2)
+        jacc = len(inter) / len(union)
+        jaccs.append((cap1, cap2, jacc))
+
+    return jaccs
+
+
+def add_caption_context(pairs, config):
+    """
+    Add image captions as context.
+    """
+
+    if config["Functions"]["generator"].startswith("caption"):
+        coco_keys = True
+    else:
+        coco_keys = False
+        vg2coco = get_vg_image_ids(config)
+
+    captions = coco_as_dict_list(config)
+
+    for pair in pairs:
+        origid = pair.orig_img
+        if not coco_keys:
+            origid = vg2coco[origid]
+        curr_captions = captions[origid]
+        if "context_cap_obj" in pair.info:
+            used_captions = [pair.info["context_cap_obj"], pair.info["2nd_cap_object"]]
+            curr_captions = [c for c in curr_captions if c not in used_captions]
+        chosen = random.choice(curr_captions)
+
+        #correct_text = pair.correct['regions'][0]['content']
+        #comb_text = chosen + " " + correct_text
+        new_region = {"region_number": 0, "content": chosen["caption"].strip()}
+        pair.correct['regions'] = [new_region] + pair.correct['regions']
+        #pair.correct['regions'][0]['content'] = comb_text
+
+        #foiled_text = pair.foiled['regions'][0]['content']
+        #comb_text = chosen + " " + foiled_text
+        #pair.foiled['regions'][0]['content'] = comb_text
+        pair.foiled['regions'] = [new_region] + pair.foiled['regions']
+        pair.region_meta["0"] = "context_caption"
+
+    return pairs
