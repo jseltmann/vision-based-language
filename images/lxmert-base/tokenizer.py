@@ -37,7 +37,8 @@ def unkify_sentence(sentence, tokenizer):
 
 def main(args):
     logger.info("Loading tokenizer")
-    tokenizer = tr.BertTokenizer.from_pretrained("bert-base-uncased")
+    #tokenizer = AutoTokenizer.from_pretrained(str(args.model_path))
+    tokenizer = tr.LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
 
     logger.info("Reading sentences from %s", args.inputf)
     sentences = readlines(args.inputf)

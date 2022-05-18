@@ -16,7 +16,7 @@ with open("/opt/spec.json", "r") as spec_f:
 # Load tokenizer.
 #model_path = os.environ["TRANSFORMER_MODEL_PATH"]
 #tokenizer = tr.BertTokenizer.from_pretrained("bert-base-uncased")
-tokenizer = tr.BertTokenizer.from_pretrained("/opt/transformers/model_files")
+tokenizer = tr.BertTokenizer.from_pretrained("bert-base-uncased")
 
 def filter_none(xs):
     return [x for x in xs if x is not None]

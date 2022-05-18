@@ -7,12 +7,14 @@ import os
 import logging
 from pathlib import Path
 import sys
-
+import spacy
 import torch
 import numpy as np
+import pickle
 
 #from transformers import AutoTokenizer
-import transformers as tr
+#import transformers as tr
+#from train_bow import SpacyTokenizer
 
 
 logging.basicConfig(level=logging.INFO)
@@ -25,19 +27,28 @@ def readlines(inputf):
     return lines
 
 def tokenize_sentence(sentence, tokenizer):
-    sent_tokens = tokenizer.tokenize(sentence)
+    #sent_tokens = tokenizer(sentence)
+    sent_tokens = tokenizer.tokenizer(sentence)
+    sent_tokens = [t.text for t in sent_tokens]
     return sent_tokens
 
 def unkify_sentence(sentence, tokenizer):
     #sent_token_ids = tokenizer.encode(sentence)
-    sent_tokens = tokenizer.tokenize(sentence)
-    sent_token_ids = tokenizer.convert_tokens_to_ids(sent_tokens)
-    unk_id = tokenizer.convert_tokens_to_ids(tokenizer.unk_token)
-    return ["1" if idx == unk_id else "0" for idx in sent_token_ids]
+    #sent_tokens = tokenizer(sentence)
+    sent_tokens = tokenizer.tokenizer(sentence)
+    #sent_token_ids = tokenizer.convert_tokens_to_ids(sent_tokens)
+    #unk_id = tokenizer.convert_tokens_to_ids(tokenizer.unk_token)
+    #return ["1" if idx == unk_id else "0" for idx in sent_token_ids]
+    return ["0" for t in sent_tokens]
 
 def main(args):
     logger.info("Loading tokenizer")
-    tokenizer = tr.BertTokenizer.from_pretrained("bert-base-uncased")
+    #tokenizer = AutoTokenizer.from_pretrained(str(args.model_path))
+    #tokenizer = tr.BertTokenizer.from_pretrained("bert-base-uncased")
+    #with open("/opt/classifier.pkl", "rb") as clsf:
+    #    cls = pickle.load(clsf)
+    #tokenizer = cls['tfidf'].tokenizer
+    tokenizer = spacy.load("en_core_web_sm")#cls['tfidf']
 
     logger.info("Reading sentences from %s", args.inputf)
     sentences = readlines(args.inputf)
