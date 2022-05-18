@@ -6,6 +6,7 @@ import inflect
 import spacy
 from collections import defaultdict
 from tqdm import tqdm
+import unicodedata
 
 random.seed(0)
 
@@ -52,6 +53,16 @@ class FoilPair:
         self.formula = None
 
         self.info = info
+
+    def __str__(self):
+        s = str(self.orig_img) + "\n" + str(self.foil_img) + "\n"
+        s += "correct:\n"
+        for r in self.correct["regions"]:
+            s += r["content"] + "\n"
+        s += "foiled:\n"
+        for r in self.foiled["regions"]:
+            s += r["content"] + "\n"
+        return s
 
 
 def get_vg_image_ids(config, reverse=False):
@@ -108,10 +119,8 @@ def ade_fn2index(fn):
 
 
 def get_ade_json_path(pos, data_path, index):
-    #orig_id = ade_fn2index(fn)
     orig_dir = os.path.join(data_path, index["folder"][pos])
     fn = index['filename'][pos].split(".")[0] + ".json"
-    #json_name = fn.split(".")[0] + ".json"
     json_path = os.path.join(orig_dir, fn)
     return json_path
 
@@ -205,8 +214,7 @@ def vg_as_dict(config, filename, keys="coco"):
     """
 
     vg_path = config["Datasets"]["vg_path"]
-    if keys == "coco":
-        vg2coco = get_vg_image_ids(config)
+    vg2coco = get_vg_image_ids(config)
     if filename.endswith("json"):
         with open(os.path.join(vg_path, filename)) as rel_file:
             info = json.loads(rel_file.read())
@@ -219,6 +227,8 @@ def vg_as_dict(config, filename, keys="coco"):
             img_id = img['image_id']
         else:
             img_id = img['id']
+        if not img_id in vg2coco: # only use images in coco-val
+            continue
         if keys == "coco":
             if not img_id in vg2coco:
                 continue
@@ -291,27 +301,20 @@ def ade_cat2text(cat):
     return sentence
 
 
-def tokenize_caps(pairs, coco_dict):
+def tokenize_caps(coco_dict):
     nlp = spacy.load("en_core_web_sm")
     stopwords = nlp.Defaults.stop_words
-    for pair in pairs:
-        cs_orig = coco_dict[pair.orig_img]
-        for c in cs_orig:
-            cap_text = [t.text for t in nlp.tokenizer(c["caption"])]
+    tokenized_dict = dict()
+    for img_id, captions in coco_dict.items():
+        tokenized_caps = []
+        for caption in captions:
+            cap_text = [t.text.lower() for t in nlp.tokenizer(caption["caption"])]
             w1 = set(cap_text)
             w1 = {word for word in w1 if word not in stopwords}
-            c["tokenized"] = w1
-        pair.info["captions_orig"] = cs_orig
-        cs_foil = coco_dict[pair.foil_img]
-        for c in cs_foil:
-            #c["tokenized"] = [t.text for t in nlp.tokenizer(c["caption"])]
-            cap_text = [t.text for t in nlp.tokenizer(c["caption"])]
-            w1 = set(cap_text)
-            w1 = {word for word in w1 if word not in stopwords}
-            c["tokenized"] = w1
-        pair.info["captions_foil"] = cs_foil
-
-    return pairs
+            caption["tokenized"] = w1
+            tokenized_caps.append(caption)
+        tokenized_dict[img_id] = tokenized_caps
+    return tokenized_dict
 
 
 def get_jaccard_similarities(captions, ind_caption=None):
@@ -326,20 +329,10 @@ def get_jaccard_similarities(captions, ind_caption=None):
     else:
         caps1 = captions
     cap_pairs = [(a,b) for a in caps1 for b in captions]
-    #nlp = spacy.load("en_core_web_sm")
-    #stopwords = nlp.Defaults.stop_words
 
     jaccs = []
     for (cap1, cap2) in cap_pairs:
-        #cap1_text = cap1["tokenized"]
-        #w1 = set([t.text for t in nlp.tokenizer(cap1_text)])
-        #w1 = set(cap1_text)
-        #w1 = {word for word in w1 if word not in stopwords}
         w1 = cap1["tokenized"]
-        #cap2_text = cap2["tokenized"]
-        #w2 = set([t.text for t in nlp.tokenizer(cap2_text)])
-        #w2 = set(cap2_text)
-        #w2 = {word for word in w2 if word not in stopwords}
         w2 = cap2["tokenized"]
         inter = [w for w in w1 if w in w2]
         union = w1.union(w2)
@@ -371,17 +364,20 @@ def add_caption_context(pairs, config):
             used_captions = [pair.info["context_cap_obj"], pair.info["2nd_cap_object"]]
             curr_captions = [c for c in curr_captions if c not in used_captions]
         chosen = random.choice(curr_captions)
+        cap = chosen["caption"]
+        cap = cap.replace('"', '')
+        cap = " ".join([w for w in cap.split() if len(w) > 0])
 
-        #correct_text = pair.correct['regions'][0]['content']
-        #comb_text = chosen + " " + correct_text
-        new_region = {"region_number": 0, "content": chosen["caption"].strip()}
+        new_region = {"region_number": 0, "content": cap}
         pair.correct['regions'] = [new_region] + pair.correct['regions']
-        #pair.correct['regions'][0]['content'] = comb_text
 
-        #foiled_text = pair.foiled['regions'][0]['content']
-        #comb_text = chosen + " " + foiled_text
-        #pair.foiled['regions'][0]['content'] = comb_text
         pair.foiled['regions'] = [new_region] + pair.foiled['regions']
         pair.region_meta["0"] = "context_caption"
 
     return pairs
+
+
+def remove_accents(text):
+    text = ''.join([c for c in unicodedata.normalize('NFD', text)
+                    if unicodedata.category(c) != 'Mn'])
+    return text

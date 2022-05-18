@@ -8,6 +8,7 @@ import random
 import logging
 import traceback
 import shutil
+import pickle
 
 import context_generators as cg
 import foil_image_selectors as fis
@@ -56,22 +57,17 @@ def split(config, pairs):
     """
     random.shuffle(pairs)
     train_split = float(config["General"]["trainsplit"])
-    #cutoff = int(train_split * len(pairs))
     num_examples = int(config["General"]["num_examples"])
     if len(pairs) >= 2 * num_examples:
         cutoff = num_examples
     else:
         cutoff = int(train_split * len(pairs))
-    #train = pairs[:cutoff]
-    #test = pairs[cutoff:]
     test = pairs[:cutoff]
     train = pairs[cutoff:]
     train_examples = int(config["General"]["train_examples"])
     train = train[:train_examples]
 
     finetune_path = config["General"]["finetune_path"]
-    #corr_sents = []
-    #incorr_sents = []
     train_examples = []
     for pair in train:
         corr_text = ""
@@ -88,10 +84,6 @@ def split(config, pairs):
                 incorr_text += " "
         incorr_text = incorr_text.strip()
 
-        #if random.random() > 0.5:
-        #    example = ((corr_text, incorr_text), 0)
-        #else:
-        #    example = ((incorr_text, corr_text), 1)
         example = (corr_text, incorr_text)
         train_examples.append(example)
     zeros = train_examples[:int(len(train_examples)/2)]
@@ -106,6 +98,8 @@ def split(config, pairs):
 
     with open(finetune_path, "w") as ff:
         json.dump(train_examples, ff)
+    with open(finetune_path + "_raw", "wb") as rf:
+        pickle.dump(train, rf)
 
     test_path = config["General"]["test_path"]
     test_examples = []
@@ -124,10 +118,6 @@ def split(config, pairs):
                 incorr_text += " "
         incorr_text = incorr_text.strip()
 
-        #if random.random() > 0.5:
-        #    example = ((corr_text, incorr_text), 0)
-        #else:
-        #    example = ((incorr_text, corr_text), 1)
         example = (corr_text, incorr_text)
         test_examples.append(example)
 
@@ -143,6 +133,8 @@ def split(config, pairs):
 
     with open(test_path, "w") as ff:
         json.dump(test_examples, ff)
+    with open(test_path + "_raw", "wb") as rf:
+        pickle.dump(test, rf)
 
     return test, train
 
@@ -161,7 +153,6 @@ if __name__ == "__main__":
     config.read(config_path)
 
     with open("generation_combinations_pairwise.csv", newline='') as gcf:
-    #with open("generation_combinations_pairwise_debug.csv", newline='') as gcf:
         not_comment = lambda line: line[0]!='#'
         reader = csv.reader(filter(not_comment, gcf), delimiter=",")
 
@@ -198,18 +189,6 @@ if __name__ == "__main__":
                     print()
                     continue
 
-                #if not( generator_str == "vg_obj_list_generator" or \
-                #        combinator_str in ["ade_same_category_combinator", "ade_same_object_combinator", "ade_thereis_combinator"]):
-                #    old_suite_dir = "/home/jseltmann/data/suites_5k_pairwise_january_shuffle/" + row[3]
-                #    old_suite_path = old_suite_dir + "/" + row[4] + "_test.json"
-                #    shutil.copy(old_suite_path, suite_dir)
-                #    old_train_path = old_suite_dir + "/" + row[4] + "_train.json"
-                #    shutil.copy(old_train_path, suite_dir)
-                #    old_cfg_path =  old_suite_dir + "/" + row[4] + ".cfg"
-                #    shutil.copy(old_cfg_path, suite_dir)
-                #    print()
-                #    continue
-
                 cfg_copy["General"]["suite_name"] = row[4]
 
                 if row[5] != '':
@@ -230,15 +209,11 @@ if __name__ == "__main__":
                         cfg_copy["Other"][other] = "True"
 
                 pairs = selector(cfg_copy)
-                #print(len(pairs))
                 print("selected" + ", ", end='', flush=True)
                 with_context = generator(pairs, cfg_copy)
-                #print(len(with_context))
                 print("context" + ", ", end='', flush=True)
                 combined = combinator(with_context, cfg_copy)
-                #print(len(combined))
                 print("combined" + ", ", end='', flush=True)
-                #print(len(combined), end='', flush=True)
 
                 if not os.path.exists(suite_dir):
                     os.makedirs(suite_dir)
@@ -256,10 +231,6 @@ if __name__ == "__main__":
                 generate_suite(test, save_path, suite_name, 
                         (generator_str, selector_str, combinator_str))
 
-                ### save train data as suite for debugging
-                #generate_suite(train, save_path+"_train", suite_name, 
-                #        (generator_str, selector_str, combinator_str))
-
                 cfg_path = os.path.join(suite_dir, suite_name+".cfg")
                 with open(cfg_path, "w") as configfile:
                     cfg_copy.write(configfile)
@@ -269,9 +240,9 @@ if __name__ == "__main__":
                     if not os.path.exists(suite_dir):
                         os.makedirs(suite_dir)
 
-                    cfg_copy["General"]["test_path"] = suite_dir + "/" + row[4] + "+cap_test.json"
-                    cfg_copy["General"]["suite_path"] = suite_dir + "/" + row[4] + "+cap_suite.json"
-                    cfg_copy["General"]["finetune_path"] = suite_dir + "/" + row[4] + "+cap_train.json"
+                    cfg_copy["General"]["test_path"] = suite_dir + "/" + row[4] + "_cap_test.json"
+                    cfg_copy["General"]["suite_path"] = suite_dir + "/" + row[4] + "_cap_suite.json"
+                    cfg_copy["General"]["finetune_path"] = suite_dir + "/" + row[4] + "_cap_train.json"
                     test, train = split(cfg_copy, combined)
                     cfg_copy["General"]["train_examples"] = str(len(train))
                     cfg_copy["General"]["test_examples"] = str(len(test))
@@ -287,10 +258,9 @@ if __name__ == "__main__":
                     print("extra context" + ", ", end='', flush=True)
                 print()
             except Exception as e:
-                raise(e)
                 print(e)
                 with open("errors.log", "a") as ef:
                     ef.write(row[4] + "\n")
                     ef.write(str(e))
-                #    ef.write(str(e.__traceback__))
                     ef.write("\n\n")
+                raise(e)
