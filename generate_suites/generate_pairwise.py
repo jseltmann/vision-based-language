@@ -15,6 +15,57 @@ import foil_image_selectors as fis
 import combinators as com
 import generation_utils as gu
 
+
+def generate_jsonl(pairs, save_path, suite_name, functions):
+    """
+    Write out pairs in this format: https://github.com/sebschu/discourse-entity-lm/blob/main/stimuli/2nouns_full_sentence_hand_written_stimuli.jsonl
+
+    Parameters
+    ----------
+    pairs : [FoilPair]
+        Duh.
+    save_path : str
+        Filepath to save the suite to.
+    suite_name : str
+        Name of suite.
+    functions : (str, str, str)
+        Names of (generator, selector, combinator) functions used to create suite.
+    """
+
+    items = []
+
+    for i, pair in enumerate(pairs):
+        item = dict()
+        item['id'] = i
+        exp = ""
+        for r in pair.correct["regions"]:
+            t = r["content"]
+            exp += t + " "
+        exp = exp.strip()
+        item['exp_sentence'] = exp
+
+        unexp = ""
+        for r in pair.foiled["regions"]:
+            t = r["content"]
+            unexp += t + " "
+        unexp = unexp.strip()
+        item['unexp_sentence'] = unexp
+
+        item['prompt'] = pair.context[0]
+        item['exp_continuation'] = exp.split(pair.context[0])[-1].strip()
+        item['unexp_continuation'] = unexp.split(pair.context[0])[-1].strip()
+        if "type" in pair.info:
+            item['type'] = pair.info["type"]
+        else:
+            item['type'] = None
+        items.append(item)
+
+    with open(save_path, "w") as suite_file:
+        for item in items:
+            t = json.dumps(item)
+            suite_file.write(t + "\n")
+
+
 def generate_suite(pairs, save_path, suite_name, functions):
     """
     Turn pairs produced by the combinator into a syntaxgym suite.
@@ -131,8 +182,8 @@ def split(config, pairs):
 
     random.shuffle(test_examples)
 
-    with open(test_path, "w") as ff:
-        json.dump(test_examples, ff)
+    #with open(test_path, "w") as ff:
+    #    json.dump(test_examples, ff)
     with open(test_path + "_raw", "wb") as rf:
         pickle.dump(test, rf)
 
@@ -145,14 +196,15 @@ if __name__ == "__main__":
 
     if len(sys.argv) != 2:
         print("Using default config file.")
-        config_path = "pairwise.config"
+        #config_path = "pairwise.config"
+        config_path = "generation.config"
     else:
         config_path = sys.argv[1]
 
     config = configparser.ConfigParser()
     config.read(config_path)
 
-    with open("generation_combinations_pairwise.csv", newline='') as gcf:
+    with open("generation_combinations_paper.csv", newline='') as gcf:
         not_comment = lambda line: line[0]!='#'
         reader = csv.reader(filter(not_comment, gcf), delimiter=",")
 
@@ -225,10 +277,12 @@ if __name__ == "__main__":
                 save_path = cfg_copy["General"]["suite_path"]
                 suite_name = cfg_copy["General"]["suite_name"]
 
-                if len(test) == 0:
-                    print()
-                    continue
-                generate_suite(test, save_path, suite_name, 
+                #if len(test) == 0:
+                #    print()
+                #    continue
+                #generate_suite(test, save_path, suite_name, 
+                #        (generator_str, selector_str, combinator_str))
+                generate_jsonl(test, save_path, suite_name, 
                         (generator_str, selector_str, combinator_str))
 
                 cfg_path = os.path.join(suite_dir, suite_name+".cfg")
@@ -253,7 +307,7 @@ if __name__ == "__main__":
                     if len(test) == 0:
                         print()
                         continue
-                    generate_suite(test, save_path, suite_name, 
+                    generate_jsonl(test, save_path, suite_name, 
                             (generator_str, selector_str, combinator_str))
                     print("extra context" + ", ", end='', flush=True)
                 print()

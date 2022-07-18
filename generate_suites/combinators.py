@@ -9,7 +9,7 @@ from tqdm import tqdm
 from gensim.models import Word2Vec
 from gensim.similarities.annoy import AnnoyIndexer
 import spacy
-
+from nltk.stem import WordNetLemmatizer
 import generation_utils as gu
 
 random.seed(0)
@@ -645,6 +645,133 @@ def ade_same_object_combinator(pairs, config):
 
         new_pair.region_meta = {"1": "before", "2": "category", "3": "thereis"}
         new_pair.formula = "(2;%foiled%) > (2;%correct%)"
+        pairs_with_text.append(new_pair)
+
+    return pairs_with_text
+
+
+def ade_object_part_paper_combinator(pairs, config):
+    """
+    Generate following the pattern "This is an [object]. The [part1] is [broken|dirty|missing|ugly|beautiful|particularly large/small]."
+    vs. "This is an [object]. The [part2] is [...]."
+    """
+    p = inflect.engine()
+    nlp = spacy.load("en_core_web_sm")
+    wnl = WordNetLemmatizer()
+    pairs_with_text = []
+
+    if len(pairs) > 20000:
+        pairs = random.choices(pairs, k=20000)
+
+    for pair in pairs:
+        obj = pair.info["object"].split(",")[0] # use the first name in the list
+        #r1 = gu.ade_cat2text(cat)
+        r1 = "This is " + p.a(obj) + "."
+        pair.context = (r1,)
+
+        #sn = p.singular_noun(orig_obj)
+        orig_part = pair.info["orig_part"].split(",")[0].strip()
+        orig_part = gu.remove_accents(orig_part)
+        correct_text = "The " + orig_part
+        #if not sn or orig_part == sn: # singular
+        lemma = wnl.lemmatize(orig_part)
+        if lemma == orig_part: # singular
+            correct_text += " is "
+        else:
+            correct_text += " are "
+
+        foil_part = pair.info["foil_part"].split(",")[0].strip()
+        foil_part = gu.remove_accents(foil_part)
+        #sn = p.singular_noun(foil_part)
+        lemma = wnl.lemmatize(foil_part, 'n')
+        foiled_text = "The " + foil_part
+        #if not sn or foil_part == sn: # singular
+        if lemma == foil_part: # singular
+            foiled_text += " is "
+        else:
+            foiled_text += " are "
+
+        adjectives = ["broken","dirty","missing","ugly", "beautiful", "particularly large", "particularly small"]
+        adjective = random.choice(adjectives)
+
+        new_pair = copy.deepcopy(pair)
+        #correct_text += adjective + "."
+        text = r1 + " " + correct_text + adjective + "."
+        new_pair.correct["regions"].append({"region_number":1, "content":text})
+        #new_pair.correct["regions"].append({"region_number":2, "content":orig_obj})
+        #new_pair.correct["regions"].append({"region_number":3, "content":"."})
+
+        #foiled_text += adjective + "."
+        text = r1 + " " + foiled_text + adjective + "."
+        new_pair.foiled["regions"].append({"region_number":1, "content":text})
+        #new_pair.foiled["regions"].append({"region_number":2, "content":foil_obj})
+        #new_pair.foiled["regions"].append({"region_number":3, "content":"."})
+
+        new_pair.region_meta = {"1": "text"}#, "2":"object", "3": "end"}
+        new_pair.formula = "(1;%foiled%) > (1;%correct%)"
+        pairs_with_text.append(new_pair)
+
+    return pairs_with_text
+
+
+def ade_same_category_paper_combinator(pairs, config):
+    """
+    Generate following the pattern "This is a [category]. The [object1] is [broken|dirty|missing|ugly|beautiful|particularly large/small]."
+    vs. "This is a [category]. The [object2] is [...]."
+    """
+    p = inflect.engine()
+    nlp = spacy.load("en_core_web_sm")
+    wnl = WordNetLemmatizer()
+    pairs_with_text = []
+
+    if len(pairs) > 20000:
+        pairs = random.choices(pairs, k=20000)
+
+    for pair in pairs:
+        cat = pair.info["category"]
+        orig_obj = pair.info["orig_obj"].strip()
+        orig_obj = gu.remove_accents(orig_obj)
+        r1 = gu.ade_cat2text(cat)
+        pair.context = (r1,)
+
+        #sn = p.singular_noun(orig_obj)
+        correct_text = "The " + orig_obj
+        #if not sn or orig_obj == sn: # singular
+        lemma = wnl.lemmatize(orig_obj)
+        if lemma == orig_obj: # singular
+            correct_text += " is "
+        else:
+            correct_text += " are "
+
+        foil_obj = pair.info["foil_obj"].strip()
+        foil_obj = gu.remove_accents(foil_obj)
+        #sn = p.singular_noun(foil_obj)
+        lemma = wnl.lemmatize(foil_obj, 'n')
+        foiled_text = "The " + foil_obj
+        #if not sn or foil_obj == sn: # singular
+        if lemma == foil_obj: # singular
+            foiled_text += " is "
+        else:
+            foiled_text += " are "
+
+        adjectives = ["broken","dirty","missing","ugly", "beautiful", "particularly large", "particularly small"]
+        adjective = random.choice(adjectives)
+
+        new_pair = copy.deepcopy(pair)
+        #correct_text += adjective + "."
+        text = r1 + " " + correct_text + adjective + "."
+        new_pair.correct["regions"].append({"region_number":1, "content":text})
+        #new_pair.correct["regions"].append({"region_number":2, "content":orig_obj})
+        #new_pair.correct["regions"].append({"region_number":3, "content":"."})
+
+        #foiled_text += adjective + "."
+        text = r1 + " " + foiled_text + adjective + "."
+        new_pair.foiled["regions"].append({"region_number":1, "content":text})
+        #new_pair.foiled["regions"].append({"region_number":2, "content":foil_obj})
+        #new_pair.foiled["regions"].append({"region_number":3, "content":"."})
+
+        new_pair.region_meta = {"1": "text"}#, "2":"object", "3": "end"}
+        new_pair.formula = "(1;%foiled%) > (1;%correct%)"
         pairs_with_text.append(new_pair)
 
     return pairs_with_text

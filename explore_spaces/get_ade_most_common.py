@@ -5,6 +5,7 @@ import codecs
 import os
 import json
 from scipy.stats import spearmanr
+from nltk.stem import WordNetLemmatizer
 
 
 def get_spearman_corrs():
@@ -185,9 +186,9 @@ def get_ade_scenes_frequencies_raw_names(obj_first=True):
         return cat_counter
 
 
-def get_ade_scenes_tfidf_raw_names(obj_first=True):
-    index_path = "/home/jseltmann/data/ADE20K_2021_17_01/index_ade20k.pkl"
-    data_base_path = "/home/jseltmann/data/"
+def get_ade_scenes_tfidf_raw_names(obj_first=True, filter_animacy=False, filter_plurals=False):
+    index_path = "/home/johann/Studium/MA/datasets/ADE20K_2021_17_01/index_ade20k.pkl"
+    data_base_path = "/home/johann/Studium/MA/datasets/"
     with open(index_path, "rb") as indf:
         index = pickle.load(indf)
     cat_counter = dict()
@@ -200,6 +201,8 @@ def get_ade_scenes_tfidf_raw_names(obj_first=True):
     file_paths = [os.path.join(p,fn) for p,fn in zip(paths,fns)]
     json_paths = [p.split(".")[0] + ".json" for p in file_paths]
 
+    wnl = WordNetLemmatizer()
+
     for jpath in json_paths:
         cat = jpath.split("/")[-3]# + "/" + jpath.split("/")[-2]
         if not cat in all_objs:
@@ -210,9 +213,16 @@ def get_ade_scenes_tfidf_raw_names(obj_first=True):
             annot = json.load(jfile)['annotation']
         #obj_names = [o['raw_name'] for o in annot['object']]
         for o in annot['object']:
+            if filter_animacy and o['name_ndx'] in [1831, 29]:
+                continue
             obj_names = o['name'].split(", ")
             obj_names.append(o['raw_name'])
             for obj_name in obj_names:
+                if filter_plurals:
+                    lemma = wnl.lemmatize(obj_name, "n")
+                    if lemma != obj_name:
+                        # sort out plurals
+                        continue
                 if not cat in cat_counter:
                     cat_counter[cat] = dict()
                 if not sce in cat_counter[cat]:
@@ -251,6 +261,75 @@ def get_ade_scenes_tfidf_raw_names(obj_first=True):
                             tfidfs[cat][sce] = dict()
                         tfidfs[cat][sce][obj_name] = tfs[sce] * idf
     return tfidfs
+
+
+def get_ade_tfidf_obj_part(filter_animacy=False, filter_plurals=False):
+    index_path = "/home/johann/Studium/MA/datasets/ADE20K_2021_17_01/index_ade20k.pkl"
+    data_base_path = "/home/johann/Studium/MA/datasets/"
+    with open(index_path, "rb") as indf:
+        index = pickle.load(indf)
+    obj_counter = dict()
+    obj_num = defaultdict(int)
+    all_parts = set()
+
+    paths = index["folder"]
+    fns = index["filename"]
+    file_paths = [os.path.join(p,fn) for p,fn in zip(paths,fns)]
+    json_paths = [p.split(".")[0] + ".json" for p in file_paths]
+
+    wnl = WordNetLemmatizer()
+
+    for jpath in json_paths:
+        #cat = jpath.split("/")[-3]# + "/" + jpath.split("/")[-2]
+        jpath = os.path.join(data_base_path, jpath)
+        with codecs.open(jpath, "r", "ISO-8859-1") as jfile:
+            annot = json.load(jfile)['annotation']
+        #obj_names = [o['raw_name'] for o in annot['object']]
+        for o in annot['object']:
+            name = o['name']
+            parts = o['parts']['hasparts']
+            if isinstance(parts, int):
+                parts = [parts]
+            for pnum in parts:
+                if pnum >= len(annot['object']):
+                    continue
+                part = annot['object'][pnum]
+                if filter_animacy and part['name_ndx'] in [1831, 29]:
+                    continue
+                pname = part['name']
+                if filter_plurals:
+                    lemma = wnl.lemmatize(pname, "n")
+                    if lemma != pname:
+                        # sort out plurals
+                        continue
+                if not name in obj_counter:
+                    obj_counter[name] = defaultdict(int)
+                obj_counter[name][pname] += 1
+                all_parts.add(pname)
+            obj_num[name] += 1
+
+    tfidfs = dict()
+    for part_name in all_parts:
+        df = 0
+        tfs = dict()
+        for obj in obj_counter:
+            all_terms = sum(obj_counter[obj].values())
+            part_count = obj_counter[obj][part_name]
+            tf = part_count / all_terms
+            tfs[obj] = tf
+            if part_count > 0:
+                df += 1
+        if df > 0:
+            idf = 1 + np.log(len(obj_counter) / df)
+            for obj in obj_counter:
+                #if obj_first:
+                #    tfidfs[obj_name][cat] = tfs[cat] * idf
+                #else:
+                if not obj in tfidfs:
+                    tfidfs[obj] = dict()
+                tfidfs[obj][part_name] = tfs[obj] * idf
+
+    return tfidfs, obj_num
 
 
 def get_ade_tfidf_raw_names(print_tfidfs=False, obj_first=True):

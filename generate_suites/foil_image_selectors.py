@@ -11,7 +11,7 @@ import generation_utils as gu
 import selection_conditions as sc
 
 sys.path.append("../explore_spaces")
-from get_ade_most_common import get_ade_tfidf_raw_names, get_ade_frequencies_raw_names, get_ade_scenes_tfidf_raw_names, get_ade_scenes_frequencies_raw_names
+from get_ade_most_common import get_ade_tfidf_raw_names, get_ade_frequencies_raw_names, get_ade_scenes_tfidf_raw_names, get_ade_scenes_frequencies_raw_names, get_ade_tfidf_obj_part
 
 random.seed(0)
 
@@ -44,6 +44,163 @@ def ade_tfidf_same_category_selector(config):
                 pair = gu.FoilPair(None, None, info=info)
                 pairs.append(pair)
     return pairs
+
+
+def ade_tfidf_same_scene_paper_selector(config):
+    """
+    Select two objects from a scene type,
+    one with a high tfidf or frequency and one with a low one.
+    """
+    if "ade_frequency" in config["Other"]:
+        tfidfs = get_ade_scenes_frequencies_raw_names(obj_first=False)
+    else:
+        tfidfs = get_ade_scenes_tfidf_raw_names(obj_first=False, filter_animacy=True, filter_plurals=True)
+    pairs = []
+
+    use_cats = []
+    if "home_or_hotel" in config["Other"]:
+        use_cats.append("home_or_hotel")
+    if "shopping_and_dining" in config["Other"]:
+        use_cats.append("shopping_and_dining")
+    if "transportation" in config["Other"]:
+        use_cats.append("transportation")
+
+    for cat in tfidfs:
+        if not cat in use_cats:
+            continue
+        for sce in tfidfs[cat]:
+            if sce.startswith("outliers"):
+                continue
+            objs = tfidfs[cat][sce].items()
+            objs = sorted(objs, key=lambda t: t[1])
+            non_zero = [o for o in objs if o[1] != 0]
+            #avg = np.mean([o[1] for o in non_zero])
+            #above = [o[0] for o in non_zero if o[1] > avg]
+            #below = [o[0] for o in non_zero if o[1] < avg]
+            #high_tfidf = above[-35:] #35 chosen because that gives a good number of examples
+            high_tfidf = [o[0] for o in non_zero[-3:]]
+            low_tfidf = [o[0] for o in non_zero[:1]]
+            for high in high_tfidf:
+                for low in low_tfidf:
+                    if "use_ade_cat" in config["Other"]:
+                        info = {"category": cat, "outer_cat": cat, "orig_obj": high, "foil_obj": low, "type": "scene-object"}
+                    else:
+                        info = {"category": sce, "outer_cat": cat, "orig_obj": high, "foil_obj": low, "type": "scene-object"}
+                    pair = gu.FoilPair(None, None, info=info)
+                    pairs.append(pair)
+    return pairs
+
+
+def ade_tfidf_object_part_paper_selector(config):
+    """
+    Select two object parts, one with a high and one with a low tfidf.
+    """
+    if "ade_frequency" in config["Other"]:
+        #tfidfs = get_ade_scenes_frequencies_raw_names(obj_first=False)
+        raise("Not implemented")
+    else:
+        tfidfs, obj_freq = get_ade_tfidf_obj_part(filter_animacy=True, filter_plurals=True)
+    pairs = []
+
+    obj_freq_filtered = dict()
+    for obj in obj_freq:
+        if obj in tfidfs and len(tfidfs[obj]) > 3:
+            obj_freq_filtered[obj] = obj_freq[obj]
+
+    obj_freq = sorted(list(obj_freq_filtered.items()), reverse=True, key=lambda t:t[1])
+    most_common = [t[0] for t in obj_freq[:50]]
+
+    for obj in most_common:
+        parts = tfidfs[obj].items()
+        parts = sorted(parts, key=lambda t: t[1])
+        non_zero = [o for o in parts if o[1] != 0]
+        high_tfidf = [o[0] for o in non_zero[-3:]]
+        low_tfidf = [o[0] for o in non_zero[:1]]
+        for high in high_tfidf:
+            for low in low_tfidf:
+                info = {"object": obj, "orig_part": high, "foil_part": low, "type": "object-part"}
+                pair = gu.FoilPair(None, None, info=info)
+                pairs.append(pair)
+    return pairs
+
+
+def ade_tfidf_object_part_paper_no_occ_selector(config):
+    """
+    Select two object parts, one with a high and one with a low tfidf.
+    """
+    if "ade_frequency" in config["Other"]:
+        #tfidfs = get_ade_scenes_frequencies_raw_names(obj_first=False)
+        raise("Not implemented")
+    else:
+        tfidfs, obj_freq = get_ade_tfidf_obj_part(filter_animacy=True, filter_plurals=True)
+    pairs = []
+
+    #obj_freq = sorted(list(obj_freq.items()), reverse=True, key=lambda t:t[1])
+    #most_common = [t[0] for t in obj_freq[:50]]
+    obj_freq_filtered = dict()
+    for obj in obj_freq:
+        if obj in tfidfs and len(tfidfs[obj]) >= 3:
+            obj_freq_filtered[obj] = obj_freq[obj]
+
+    obj_freq = sorted(list(obj_freq_filtered.items()), reverse=True, key=lambda t:t[1])
+    most_common = [t[0] for t in obj_freq[:50]]
+
+    for obj in most_common:
+        parts = tfidfs[obj].items()
+        parts = sorted(parts, key=lambda t: t[1])
+        non_zero = [o for o in parts if o[1] != 0]
+        high_tfidf = [o[0] for o in non_zero[-3:]]
+        zero = [o[0] for o in parts if o[1] == 0]
+        low_tfidf = [random.choice(zero)]
+        for high in high_tfidf:
+            for low in low_tfidf:
+                info = {"object": obj, "orig_part": high, "foil_part": low, "type": "object-part-no-occ"}
+                pair = gu.FoilPair(None, None, info=info)
+                pairs.append(pair)
+    return pairs
+
+
+def ade_tfidf_same_scene_no_occ_paper_selector(config):
+    """
+    Select two objects from a category,
+    one with a high tfidf and one which didn't occur in the category.
+    """
+    if "ade_frequency" in config["Other"]:
+        tfidfs = get_ade_scenes_frequencies_raw_names(obj_first=False)
+    else:
+        tfidfs = get_ade_scenes_tfidf_raw_names(obj_first=False, filter_animacy=True, filter_plurals=True)
+    pairs = []
+
+    for cat in tfidfs:
+        if cat != "home_or_hotel":
+            continue
+        for sce in tfidfs[cat]:
+            if sce.startswith("outliers"):
+                continue
+            objs = tfidfs[cat][sce].items()
+            objs = sorted(objs, key=lambda t: t[1])
+            non_zero = [o for o in objs if o[1] != 0]
+            #avg = np.mean([o[1] for o in non_zero])
+            #above = [o[0] for o in non_zero if o[1] > avg]
+            #high_tfidf = above[-35:]
+            high_tfidf = [o[0] for o in non_zero[-3:]]
+
+            zero = [o[0] for o in objs if o[1] == 0]
+            #print(len(zero))
+            zero = random.choice(zero)
+            #print(zero)
+            #zero = [zero]
+
+            for high in high_tfidf:
+                #for low in zero:
+                if "use_ade_cat" in config["Other"]:
+                    info = {"category": cat, "outer_cat": cat, "orig_obj": high, "foil_obj": zero, "type": "scene-object-no-occ"}
+                else:
+                    info = {"category": sce, "outer_cat": cat, "orig_obj": high, "foil_obj": zero, "type": "scene-object-no-occ"}
+                pair = gu.FoilPair(None, None, info=info)
+                pairs.append(pair)
+    return pairs
+
 
 
 def ade_tfidf_same_scene_selector(config):
