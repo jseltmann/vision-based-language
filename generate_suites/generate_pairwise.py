@@ -196,8 +196,7 @@ if __name__ == "__main__":
 
     if len(sys.argv) != 2:
         print("Using default config file.")
-        #config_path = "pairwise.config"
-        config_path = "generation.config"
+        config_path = "pairwise.config"
     else:
         config_path = sys.argv[1]
 
